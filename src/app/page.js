@@ -474,7 +474,7 @@ function ChatRoom({ role, onExit }) {
         </div>
 
         {/* Members row */}
-        {members.length > 0 && (
+        {/* {members.length > 0 && (
           <div style={{ padding: "0 1rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", overflowX: "auto", scrollbarWidth: "none" }}>
             <span style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.65rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>
               Room:
@@ -492,7 +492,7 @@ function ChatRoom({ role, onExit }) {
               </span>
             )}
           </div>
-        )}
+        )} */}
       </div>
 
       {/* ── Messages ── */}
