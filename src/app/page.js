@@ -442,12 +442,12 @@ function ChatRoom({ role, onExit }) {
             >
               Night Syndicate
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", marginTop: "0.125rem" }}>
+            {/* <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", marginTop: "0.125rem" }}>
               <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80" }} />
               <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.68rem", color: "rgba(255,255,255,0.28)" }}>
                 {members.length} online
               </span>
-            </div>
+            </div> */}
           </div>
 
           {/* Role badge */}
