@@ -85,7 +85,7 @@ function Lobby({ onEnter }) {
           <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 8px #e53e3e" }} />
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>
-              Night Room Active
+              Mafia vs Civilians
             </span>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 8px #e53e3e" }} />
           </div>
@@ -243,7 +243,7 @@ function Lobby({ onEnter }) {
         </div>
 
         <p style={{ textAlign: "center", marginTop: "1.5rem", fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.12)" }}>
-          Anonymous · No records · Night room
+          Warning: prolonged eye contact may result in elimination.
         </p>
       </div>
     </div>
