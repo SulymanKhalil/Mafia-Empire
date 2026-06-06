@@ -2,8 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import Pusher from "pusher-js";
 
-const CHANNEL = "night-syndicate";
-
 // ── Load Font Awesome once ───────────────────────────────────────────────────
 if (typeof document !== "undefined" && !document.getElementById("fa-cdn")) {
   const link = document.createElement("link");
@@ -14,34 +12,129 @@ if (typeof document !== "undefined" && !document.getElementById("fa-cdn")) {
   document.head.appendChild(link);
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function generateRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 // ── API helpers ──────────────────────────────────────────────────────────────
-async function apiJoin(role) {
+async function apiJoin(role, roomCode) {
   await fetch("/api/join", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, roomCode }),
   });
 }
 
-async function apiLeave(role) {
+async function apiLeave(role, roomCode) {
   await fetch("/api/leave", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, roomCode }),
   });
 }
 
-async function apiMessage(text, role) {
+async function apiMessage(text, role, roomCode) {
   await fetch("/api/message", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, role }),
+    body: JSON.stringify({ text, role, roomCode }),
   });
+}
+
+async function apiRegisterRoom(roomCode) {
+  await fetch("/api/register-room", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomCode }),
+  });
+}
+
+async function apiValidateRoom(roomCode) {
+  const res = await fetch("/api/validate-room", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomCode }),
+  });
+  const data = await res.json();
+  return data.valid === true;
+}
+
+// ── Shared background decorations ────────────────────────────────────────────
+function BgDecorations() {
+  return (
+    <>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(19,40,72,0.9) 0%, transparent 70%)",
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          opacity: 0.05,
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+    </>
+  );
 }
 
 // ── Lobby ────────────────────────────────────────────────────────────────────
 function Lobby({ onEnter }) {
+  // step: "role" | "create" | "join"
+  const [step, setStep] = useState("role");
   const [role, setRole] = useState(null);
+  const [createdCode, setCreatedCode] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [joinInput, setJoinInput] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [validating, setValidating] = useState(false);
+
+  const handleCreateRoom = async () => {
+    const code = generateRoomCode();
+    setCreatedCode(code);
+    setStep("create");
+    // Register the code server-side so others can validate against it
+    await apiRegisterRoom(code);
+  };
+
+  const handleCopy = () => {
+    if (createdCode) {
+      navigator.clipboard.writeText(createdCode).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleJoinSubmit = async () => {
+    const code = joinInput.trim().toUpperCase();
+    if (code.length !== 6) {
+      setJoinError("Code must be 6 characters");
+      return;
+    }
+    setValidating(true);
+    const valid = await apiValidateRoom(code);
+    setValidating(false);
+    if (!valid) {
+      setJoinError("Please enter a valid code");
+      return;
+    }
+    onEnter(role, code);
+  };
+
+  const isMafia = role === "mafia";
 
   return (
     <div
@@ -56,28 +149,7 @@ function Lobby({ onEnter }) {
         overflow: "hidden",
       }}
     >
-      {/* Radial glow */}
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(19,40,72,0.9) 0%, transparent 70%)",
-        }}
-      />
-      {/* Grid */}
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          opacity: 0.05,
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
+      <BgDecorations />
 
       <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: "22rem" }}>
         {/* Header */}
@@ -90,7 +162,6 @@ function Lobby({ onEnter }) {
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 8px #e53e3e" }} />
           </div>
 
-          {/* Site title */}
           <h1
             style={{
               fontFamily: "'Abril Fatface', serif",
@@ -105,7 +176,7 @@ function Lobby({ onEnter }) {
               marginBottom: "0.5rem",
             }}
           >
-            Night Syndicate
+            Mafia Empire
           </h1>
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.3)" }}>
             Choose your allegiance. Enter the room.
@@ -123,123 +194,399 @@ function Lobby({ onEnter }) {
             padding: "1.5rem",
           }}
         >
-          <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
-            Select Role
-          </p>
+          {/* ── Step: Role ── */}
+          {step === "role" && (
+            <>
+              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
+                Select Role
+              </p>
 
-          {/* Role grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
-            {/* Mafia */}
-            <button
-              onClick={() => setRole("mafia")}
-              style={{
-                background: role === "mafia" ? "rgba(229,62,62,0.12)" : "rgba(255,255,255,0.03)",
-                backdropFilter: "blur(10px)",
-                border: role === "mafia" ? "1px solid rgba(229,62,62,0.45)" : "1px solid rgba(255,255,255,0.06)",
-                borderRadius: "0.875rem",
-                padding: "1rem 0.75rem",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "0.5rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                boxShadow: role === "mafia" ? "0 0 24px rgba(229,62,62,0.15)" : "none",
-              }}
-              onMouseEnter={(e) => {
-                if (role !== "mafia") {
-                  e.currentTarget.style.borderColor = "rgba(229,62,62,0.25)";
-                  e.currentTarget.style.background = "rgba(229,62,62,0.05)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (role !== "mafia") {
-                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-                  e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                }
-              }}
-            >
-              <i className="fa-solid fa-skull" style={{ fontSize: "1.4rem", color: role === "mafia" ? "#fc8181" : "rgba(255,255,255,0.4)" }} />
-              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.05em", color: role === "mafia" ? "#fc8181" : "rgba(255,255,255,0.7)" }}>
-                Mafia
-              </span>
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.28)", textAlign: "center", lineHeight: 1.4 }}>
-                Hidden in the shadows
-              </span>
-            </button>
+              {/* Role grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
+                {/* Mafia */}
+                <button
+                  onClick={() => setRole("mafia")}
+                  style={{
+                    background: role === "mafia" ? "rgba(229,62,62,0.12)" : "rgba(255,255,255,0.03)",
+                    backdropFilter: "blur(10px)",
+                    border: role === "mafia" ? "1px solid rgba(229,62,62,0.45)" : "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: "0.875rem",
+                    padding: "1rem 0.75rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: role === "mafia" ? "0 0 24px rgba(229,62,62,0.15)" : "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (role !== "mafia") {
+                      e.currentTarget.style.borderColor = "rgba(229,62,62,0.25)";
+                      e.currentTarget.style.background = "rgba(229,62,62,0.05)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (role !== "mafia") {
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+                      e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                    }
+                  }}
+                >
+                  <i className="fa-solid fa-skull" style={{ fontSize: "1.4rem", color: role === "mafia" ? "#fc8181" : "rgba(255,255,255,0.4)" }} />
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.05em", color: role === "mafia" ? "#fc8181" : "rgba(255,255,255,0.7)" }}>
+                    Mafia
+                  </span>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.28)", textAlign: "center", lineHeight: 1.4 }}>
+                    Hidden in the shadows
+                  </span>
+                </button>
 
-            {/* Civilian */}
-            <button
-              onClick={() => setRole("civilian")}
-              style={{
-                background: role === "civilian" ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.03)",
-                backdropFilter: "blur(10px)",
-                border: role === "civilian" ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.06)",
-                borderRadius: "0.875rem",
-                padding: "1rem 0.75rem",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "0.5rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                boxShadow: role === "civilian" ? "0 0 24px rgba(59,130,246,0.15)" : "none",
-              }}
-              onMouseEnter={(e) => {
-                if (role !== "civilian") {
-                  e.currentTarget.style.borderColor = "rgba(59,130,246,0.25)";
-                  e.currentTarget.style.background = "rgba(59,130,246,0.05)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (role !== "civilian") {
-                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-                  e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                }
-              }}
-            >
-              <i className="fa-solid fa-person" style={{ fontSize: "1.4rem", color: role === "civilian" ? "#60a5fa" : "rgba(255,255,255,0.4)" }} />
-              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.05em", color: role === "civilian" ? "#60a5fa" : "rgba(255,255,255,0.7)" }}>
-                Civilian
-              </span>
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.28)", textAlign: "center", lineHeight: 1.4 }}>
-                Voice of the town
-              </span>
-            </button>
-          </div>
+                {/* Civilian */}
+                <button
+                  onClick={() => setRole("civilian")}
+                  style={{
+                    background: role === "civilian" ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.03)",
+                    backdropFilter: "blur(10px)",
+                    border: role === "civilian" ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: "0.875rem",
+                    padding: "1rem 0.75rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: role === "civilian" ? "0 0 24px rgba(59,130,246,0.15)" : "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (role !== "civilian") {
+                      e.currentTarget.style.borderColor = "rgba(59,130,246,0.25)";
+                      e.currentTarget.style.background = "rgba(59,130,246,0.05)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (role !== "civilian") {
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+                      e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                    }
+                  }}
+                >
+                  <i className="fa-solid fa-person" style={{ fontSize: "1.4rem", color: role === "civilian" ? "#60a5fa" : "rgba(255,255,255,0.4)" }} />
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.05em", color: role === "civilian" ? "#60a5fa" : "rgba(255,255,255,0.7)" }}>
+                    Civilian
+                  </span>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.28)", textAlign: "center", lineHeight: 1.4 }}>
+                    Voice of the town
+                  </span>
+                </button>
+              </div>
 
-          {/* Enter */}
-          <button
-            onClick={() => role && onEnter(role)}
-            disabled={!role}
-            style={{
-              width: "100%",
-              padding: "0.875rem",
-              borderRadius: "0.875rem",
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 700,
-              fontSize: "0.8rem",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              background: role ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "rgba(255,255,255,0.04)",
-              color: role ? "#fff" : "rgba(255,255,255,0.2)",
-              border: role ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
-              cursor: role ? "pointer" : "not-allowed",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (role) {
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 6px 24px rgba(37,99,235,0.4)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            Enter Room →
-          </button>
+              {/* Create Room button */}
+              <button
+                onClick={() => role && handleCreateRoom()}
+                disabled={!role}
+                style={{
+                  width: "100%",
+                  padding: "0.875rem",
+                  borderRadius: "0.875rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  background: role ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "rgba(255,255,255,0.04)",
+                  color: role ? "#fff" : "rgba(255,255,255,0.2)",
+                  border: role ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  cursor: role ? "pointer" : "not-allowed",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.4rem",
+                  marginBottom: "0.625rem",
+                }}
+                onMouseEnter={(e) => {
+                  if (role) {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 6px 24px rgba(37,99,235,0.4)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <i className="fa-solid fa-plus" style={{ fontSize: "0.65rem" }} />
+                Create Room
+              </button>
+
+              {/* Join Room button */}
+              <button
+                onClick={() => role && setStep("join")}
+                disabled={!role}
+                style={{
+                  width: "100%",
+                  padding: "0.875rem",
+                  borderRadius: "0.875rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  background: "rgba(255,255,255,0.04)",
+                  color: role ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)",
+                  border: role ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(255,255,255,0.06)",
+                  cursor: role ? "pointer" : "not-allowed",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.4rem",
+                }}
+                onMouseEnter={(e) => {
+                  if (role) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                  e.currentTarget.style.borderColor = role ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <i className="fa-solid fa-right-to-bracket" style={{ fontSize: "0.65rem" }} />
+                Join Room
+              </button>
+            </>
+          )}
+
+          {/* ── Step: Create ── */}
+          {step === "create" && (
+            <>
+              {/* Back */}
+              <button
+                onClick={() => { setStep("role"); setCreatedCode(null); setCopied(false); }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "0.72rem",
+                  color: "rgba(255,255,255,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  padding: 0,
+                  marginBottom: "1.25rem",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+              >
+                <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
+                Back
+              </button>
+
+              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
+                Your Room Code
+              </p>
+
+              {/* Code display */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "0.875rem",
+                  padding: "0.875rem 1rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    fontFamily: "'Syne', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "1.6rem",
+                    letterSpacing: "0.3em",
+                    color: "#fff",
+                    userSelect: "all",
+                  }}
+                >
+                  {createdCode}
+                </span>
+                <button
+                  onClick={handleCopy}
+                  title="Copy code"
+                  style={{
+                    flexShrink: 0,
+                    width: "2.25rem",
+                    height: "2.25rem",
+                    borderRadius: "0.625rem",
+                    background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.06)",
+                    border: copied ? "1px solid rgba(74,222,128,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                    color: copied ? "#4ade80" : "rgba(255,255,255,0.5)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <i className={`fa-solid ${copied ? "fa-check" : "fa-copy"}`} style={{ fontSize: "0.8rem" }} />
+                </button>
+              </div>
+
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", color: "rgba(255,255,255,0.22)", marginBottom: "1.25rem" }}>
+                Share this code with others so they can join your room.
+              </p>
+
+              {/* Enter Room */}
+              <button
+                onClick={() => onEnter(role, createdCode)}
+                style={{
+                  width: "100%",
+                  padding: "0.875rem",
+                  borderRadius: "0.875rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                  color: "#fff",
+                  border: "1px solid rgba(59,130,246,0.5)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(37,99,235,0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                Enter Room →
+              </button>
+            </>
+          )}
+
+          {/* ── Step: Join ── */}
+          {step === "join" && (
+            <>
+              {/* Back */}
+              <button
+                onClick={() => { setStep("role"); setJoinInput(""); setJoinError(""); }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "0.72rem",
+                  color: "rgba(255,255,255,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  padding: 0,
+                  marginBottom: "1.25rem",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+              >
+                <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
+                Back
+              </button>
+
+              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
+                Enter Room Code
+              </p>
+
+              <input
+                type="text"
+                value={joinInput}
+                onChange={(e) => {
+                  setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6));
+                  setJoinError("");
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleJoinSubmit(); }}
+                placeholder="------"
+                maxLength={6}
+                style={{
+                  width: "100%",
+                  background: "rgba(255,255,255,0.04)",
+                  border: joinError ? "1px solid rgba(229,62,62,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "0.875rem",
+                  padding: "0.875rem 1rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "1.4rem",
+                  letterSpacing: "0.35em",
+                  color: "#fff",
+                  outline: "none",
+                  caretColor: "#3b82f6",
+                  textAlign: "center",
+                  marginBottom: "0.5rem",
+                  boxSizing: "border-box",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => { if (!joinError) e.target.style.borderColor = "rgba(59,130,246,0.4)"; }}
+                onBlur={(e) => { if (!joinError) e.target.style.borderColor = "rgba(255,255,255,0.1)"; }}
+              />
+
+              {joinError && (
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", color: "#fc8181", marginBottom: "0.75rem" }}>
+                  {joinError}
+                </p>
+              )}
+
+              <div style={{ height: joinError ? "0" : "1.25rem" }} />
+
+              {/* Enter Room */}
+              <button
+                onClick={handleJoinSubmit}
+                disabled={joinInput.length !== 6 || validating}
+                style={{
+                  width: "100%",
+                  padding: "0.875rem",
+                  borderRadius: "0.875rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  background: joinInput.length === 6 && !validating ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "rgba(255,255,255,0.04)",
+                  color: joinInput.length === 6 && !validating ? "#fff" : "rgba(255,255,255,0.2)",
+                  border: joinInput.length === 6 && !validating ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  cursor: joinInput.length === 6 && !validating ? "pointer" : "not-allowed",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (joinInput.length === 6 && !validating) {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 6px 24px rgba(37,99,235,0.4)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {validating ? "Checking..." : "Enter Room →"}
+              </button>
+            </>
+          )}
         </div>
 
         <p style={{ textAlign: "center", marginTop: "1.5rem", fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.12)" }}>
@@ -251,7 +598,7 @@ function Lobby({ onEnter }) {
 }
 
 // ── Chat Room ────────────────────────────────────────────────────────────────
-function ChatRoom({ role, onExit }) {
+function ChatRoom({ role, roomCode, onExit }) {
   const [messages, setMessages] = useState([]);
   const [members, setMembers] = useState([]);
   const [input, setInput] = useState("");
@@ -262,20 +609,18 @@ function ChatRoom({ role, onExit }) {
   const channelRef = useRef(null);
   const joinedRef = useRef(false);
 
+  const pusherChannel = `room-${roomCode}`;
+
   useEffect(() => {
-    // Init Pusher
     pusherRef.current = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
     });
 
-    const channel = pusherRef.current.subscribe(CHANNEL);
+    const channel = pusherRef.current.subscribe(pusherChannel);
     channelRef.current = channel;
 
     channel.bind("member-joined", (data) => {
-      setMembers((prev) => {
-        const next = [...prev, { displayName: data.displayName, role: data.role }];
-        return next;
-      });
+      setMembers((prev) => [...prev, { displayName: data.displayName, role: data.role }]);
       setMessages((prev) => [
         ...prev,
         { type: "system", text: `${data.displayName} joined the room`, timestamp: data.timestamp },
@@ -300,37 +645,45 @@ function ChatRoom({ role, onExit }) {
       setMessages((prev) => [...prev, { ...data, type: "message" }]);
     });
 
-    // Join once
+    // Announce join once the Pusher subscription is fully live.
+    // On fast connections subscription_succeeded may fire before we call
+    // .bind(), so we also set a 300ms timeout as a guaranteed fallback.
+    // A `joined` flag ensures apiJoin is called exactly once either way.
     if (!joinedRef.current) {
       joinedRef.current = true;
-      apiJoin(role);
+      let joined = false;
+      const doJoin = () => {
+        if (joined) return;
+        joined = true;
+        apiJoin(role, roomCode);
+      };
+      channel.bind("pusher:subscription_succeeded", doJoin);
+      setTimeout(doJoin, 300);
     }
 
     return () => {
       channel.unbind_all();
-      pusherRef.current.unsubscribe(CHANNEL);
+      pusherRef.current.unsubscribe(pusherChannel);
       pusherRef.current.disconnect();
     };
   }, []);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Leave on tab close
   useEffect(() => {
-    const handleUnload = () => apiLeave(role);
+    const handleUnload = () => apiLeave(role, roomCode);
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [role]);
+  }, [role, roomCode]);
 
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
     setSending(true);
     setInput("");
-    await apiMessage(text, role);
+    await apiMessage(text, role, roomCode);
     setSending(false);
     inputRef.current?.focus();
   };
@@ -343,15 +696,13 @@ function ChatRoom({ role, onExit }) {
   };
 
   const handleExit = async () => {
-    await apiLeave(role);
+    await apiLeave(role, roomCode);
     onExit();
   };
 
   const formatTime = (ts) =>
     new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const mafiaCount = members.filter((m) => m.role === "mafia").length;
-  const civilianCount = members.filter((m) => m.role === "civilian").length;
   const isMafia = role === "mafia";
 
   return (
@@ -423,7 +774,7 @@ function ChatRoom({ role, onExit }) {
             Exit
           </button>
 
-          {/* Title */}
+          {/* Title + room code */}
           <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
             <div
               style={{
@@ -440,14 +791,34 @@ function ChatRoom({ role, onExit }) {
                 textOverflow: "ellipsis",
               }}
             >
-              Night Syndicate
+              Mafia Empire
             </div>
-            {/* <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", marginTop: "0.125rem" }}>
-              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80" }} />
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.68rem", color: "rgba(255,255,255,0.28)" }}>
-                {members.length} online
+            {/* Room code subtle badge */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                marginTop: "0.2rem",
+                padding: "0.15rem 0.5rem",
+                borderRadius: "999px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.07)",
+              }}
+            >
+              <i className="fa-solid fa-hashtag" style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.2)" }} />
+              <span
+                style={{
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.62rem",
+                  letterSpacing: "0.18em",
+                  color: "rgba(255,255,255,0.28)",
+                }}
+              >
+                {roomCode}
               </span>
-            </div> */}
+            </div>
           </div>
 
           {/* Role badge */}
@@ -472,27 +843,6 @@ function ChatRoom({ role, onExit }) {
             {isMafia ? "Mafia" : "Civilian"}
           </div>
         </div>
-
-        {/* Members row */}
-        {/* {members.length > 0 && (
-          <div style={{ padding: "0 1rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", overflowX: "auto", scrollbarWidth: "none" }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.65rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>
-              Room:
-            </span>
-            {mafiaCount > 0 && (
-              <span style={{ flexShrink: 0, padding: "0.25rem 0.625rem", borderRadius: "999px", fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.68rem", background: "rgba(229,62,62,0.1)", border: "1px solid rgba(229,62,62,0.2)", color: "#fc8181", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                <i className="fa-solid fa-skull" style={{ fontSize: "0.6rem" }} />
-                Mafia ×{mafiaCount}
-              </span>
-            )}
-            {civilianCount > 0 && (
-              <span style={{ flexShrink: 0, padding: "0.25rem 0.625rem", borderRadius: "999px", fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.68rem", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)", color: "#60a5fa", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                <i className="fa-solid fa-person" style={{ fontSize: "0.6rem" }} />
-                Civilian ×{civilianCount}
-              </span>
-            )}
-          </div>
-        )} */}
       </div>
 
       {/* ── Messages ── */}
@@ -523,7 +873,21 @@ function ChatRoom({ role, onExit }) {
           if (msg.type === "system") {
             return (
               <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.5rem 0" }}>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", fontStyle: "italic", color: "rgba(255,255,255,0.25)", padding: "0.25rem 0.875rem", borderRadius: "999px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "0.72rem",
+                    fontStyle: "italic",
+                    color: "rgba(255,255,255,0.5)",
+                    padding: "0.3rem 1rem",
+                    borderRadius: "999px",
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}
+                >
                   {msg.text}
                 </span>
               </div>
@@ -648,17 +1012,20 @@ function ChatRoom({ role, onExit }) {
 export default function App() {
   const [screen, setScreen] = useState("lobby");
   const [role, setRole] = useState(null);
+  const [roomCode, setRoomCode] = useState(null);
 
-  const handleEnter = (selectedRole) => {
+  const handleEnter = (selectedRole, code) => {
     setRole(selectedRole);
+    setRoomCode(code);
     setScreen("chat");
   };
 
   const handleExit = () => {
     setRole(null);
+    setRoomCode(null);
     setScreen("lobby");
   };
 
   if (screen === "lobby") return <Lobby onEnter={handleEnter} />;
-  return <ChatRoom role={role} onExit={handleExit} />;
+  return <ChatRoom role={role} roomCode={roomCode} onExit={handleExit} />;
 }

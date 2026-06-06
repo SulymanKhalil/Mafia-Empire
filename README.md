@@ -1,4 +1,4 @@
-# Night Syndicate
+# Mafia Empire
 
 Realtime anonymous Mafia chat — built with Next.js + Pusher. Deploy entirely on Netlify, no separate backend needed.
 

@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { getPusherServer, CHANNEL } from "@/lib/pusher-server";
+import { getPusherServer, getRoomChannel } from "@/lib/pusher-server";
 
 export async function POST(req) {
   try {
-    const { role } = await req.json();
+    const { role, roomCode } = await req.json();
+    if (!roomCode) return NextResponse.json({ error: "roomCode required" }, { status: 400 });
+
     const displayName = role === "mafia" ? "Mafia" : "Civilian";
     const pusher = getPusherServer();
+    const channel = getRoomChannel(roomCode);
 
-    await pusher.trigger(CHANNEL, "member-left", {
+    await pusher.trigger(channel, "member-left", {
       displayName,
       role,
       timestamp: Date.now(),

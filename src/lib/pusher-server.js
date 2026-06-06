@@ -15,4 +15,6 @@ export function getPusherServer() {
   return pusherInstance;
 }
 
-export const CHANNEL = "night-syndicate";
+export function getRoomChannel(roomCode) {
+  return `room-${roomCode}`;
+}
