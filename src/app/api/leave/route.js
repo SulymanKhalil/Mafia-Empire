@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { getPusherServer, getRoomChannel } from "@/lib/pusher-server";
+import { removeMember, getMembers } from "@/lib/room-store";
 
 export async function POST(req) {
   try {
     const { role, roomCode } = await req.json();
     if (!roomCode) return NextResponse.json({ error: "roomCode required" }, { status: 400 });
 
-    const displayName = role === "mafia" ? "Mafia" : "Civilian";
+    const roleNames = {
+      mafia: "Mafia",
+      civilian: "Civilian",
+      detective: "Detective",
+      doctor: "Doctor"
+    };
+    const displayName = roleNames[role] || "Unknown";
+    removeMember(roomCode, role);
+
     const pusher = getPusherServer();
     const channel = getRoomChannel(roomCode);
 
@@ -14,6 +23,7 @@ export async function POST(req) {
       displayName,
       role,
       timestamp: Date.now(),
+      members: getMembers(roomCode),
     });
 
     return NextResponse.json({ ok: true });

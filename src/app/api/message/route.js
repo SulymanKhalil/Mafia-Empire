@@ -9,7 +9,13 @@ export async function POST(req) {
     }
     if (!roomCode) return NextResponse.json({ error: "roomCode required" }, { status: 400 });
 
-    const displayName = role === "mafia" ? "Mafia" : "Civilian";
+    const roleNames = {
+      mafia: "Mafia",
+      civilian: "Civilian",
+      detective: "Detective",
+      doctor: "Doctor"
+    };
+    const displayName = roleNames[role] || "Unknown";
     const pusher = getPusherServer();
     const channel = getRoomChannel(roomCode);
 
