@@ -4,7 +4,7 @@ import { addMember, getMembers } from "@/lib/room-store";
 
 export async function POST(req) {
   try {
-    const { role, roomCode } = await req.json();
+    const { role, roomCode, displayName: customName } = await req.json();
     if (!role) return NextResponse.json({ error: "role required" }, { status: 400 });
     if (!roomCode) return NextResponse.json({ error: "roomCode required" }, { status: 400 });
 
@@ -14,7 +14,7 @@ export async function POST(req) {
       detective: "Detective",
       doctor: "Doctor"
     };
-    const displayName = roleNames[role] || "Unknown";
+    const displayName = customName?.trim() || roleNames[role] || "Unknown";
     addMember(roomCode, { role, displayName });
 
     const pusher = getPusherServer();

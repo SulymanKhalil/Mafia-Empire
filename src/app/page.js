@@ -2,14 +2,69 @@
 import { useState, useEffect, useRef } from "react";
 import Pusher from "pusher-js";
 
-// ── Load Font Awesome once ───────────────────────────────────────────────────
-if (typeof document !== "undefined" && !document.getElementById("fa-cdn")) {
-  const link = document.createElement("link");
-  link.id = "fa-cdn";
-  link.rel = "stylesheet";
-  link.href =
-    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";
-  document.head.appendChild(link);
+// ── Load Font Awesome + Global Styles ───────────────────────────────────────
+if (typeof document !== "undefined") {
+  if (!document.getElementById("fa-cdn")) {
+    const link = document.createElement("link");
+    link.id = "fa-cdn";
+    link.rel = "stylesheet";
+    link.href =
+      "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css";
+    document.head.appendChild(link);
+  }
+
+  if (!document.getElementById("keyframes-style")) {
+    const style = document.createElement("style");
+    style.id = "keyframes-style";
+    style.textContent = `
+      @keyframes particle-drift {
+        0% { transform: translateY(0) translateX(0); opacity: 0.55; }
+        25% { opacity: 0.7; }
+        75% { opacity: 0.4; }
+        100% { transform: translateY(-100dvh) translateX(25px); opacity: 0; }
+      }
+      @keyframes message-slide-in {
+        from { opacity: 0; transform: translateX(-8px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes message-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes typing-pulse {
+        0%, 60%, 100% { opacity: 0.4; }
+        30% { opacity: 1; }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+      }
+      @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
+      }
+      .message-bubble {
+        animation: message-slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .system-message {
+        animation: message-fade-in 0.4s ease;
+      }
+      .typing-indicator > span {
+        animation: typing-pulse 1.4s infinite;
+      }
+      .typing-indicator > span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .typing-indicator > span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @media (max-width: 640px) {
+        .room-header { font-size: 0.9rem; }
+        .message-bubble { max-width: 85vw; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -20,28 +75,131 @@ function generateRoomCode() {
   return code;
 }
 
+function getInitials(name) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() || "")
+    .join("");
+}
+
+function RoomCodeDisplay({ code, size = "sm" }) {
+  const isSm = size === "sm";
+  const chars = (code || "------").split("");
+  const fontSize = isSm ? "0.65rem" : "0.95rem";
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        display: "grid",
+        gridTemplateColumns: `repeat(${chars.length}, minmax(0, 1fr))`,
+        gap: isSm ? "0.3rem" : "0.45rem",
+        alignItems: "center",
+        overflow: "hidden",
+      }}
+    >
+      {chars.map((char, idx) => (
+        <div
+          key={idx}
+          style={{
+            width: "100%",
+            aspectRatio: "1 / 1",
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "0.4rem",
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(59,130,246,0.3)",
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 700,
+            fontSize,
+            color: "#3b82f6",
+            letterSpacing: "0.08em",
+            transition: "all 0.2s ease",
+            boxShadow: "0 0 8px rgba(59,130,246,0.1)",
+            minWidth: 0,
+            maxWidth: "2.5rem",
+            justifySelf: "center",
+          }}
+        >
+          {char}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ParticleField({ count = 18 }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      {Array.from({ length: count }).map((_, idx) => {
+        const left = `${(idx * 13) % 100}%`;
+        const top = `${(idx * 17 + 7) % 100}%`;
+        const size = 4 + ((idx * 3) % 6);
+        const delay = `${(idx * 0.75) % 14}s`;
+        return (
+          <span
+            key={idx}
+            className="particle"
+            style={{
+              position: "absolute",
+              left,
+              top,
+              width: `${size}px`,
+              height: `${size}px`,
+              borderRadius: "999px",
+              background: "rgba(255,255,255,0.14)",
+              opacity: 0.55,
+              animation: "particle-drift 14s linear infinite",
+              animationDelay: delay,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // ── API helpers ──────────────────────────────────────────────────────────────
-async function apiJoin(role, roomCode) {
+async function apiJoin(role, roomCode, displayName) {
   await fetch("/api/join", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, roomCode }),
+    body: JSON.stringify({ role, roomCode, displayName }),
   });
 }
 
-async function apiLeave(role, roomCode) {
+async function apiLeave(role, roomCode, displayName) {
   await fetch("/api/leave", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, roomCode }),
+    body: JSON.stringify({ role, roomCode, displayName }),
   });
 }
 
-async function apiMessage(text, role, roomCode) {
+async function apiMessage(text, role, roomCode, displayName) {
   await fetch("/api/message", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, role, roomCode }),
+    body: JSON.stringify({ text, role, roomCode, displayName }),
+  });
+}
+
+async function apiTyping(role, roomCode, displayName, isTyping) {
+  await fetch("/api/typing", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, roomCode, displayName, isTyping }),
+  });
+}
+
+async function apiReaction(role, roomCode, messageId, emoji, displayName) {
+  await fetch("/api/reaction", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, roomCode, messageId, emoji, displayName }),
   });
 }
 
@@ -103,18 +261,58 @@ function Lobby({ onEnter }) {
   // step: "role" | "create" | "join"
   const [step, setStep] = useState("role");
   const [role, setRole] = useState(null);
+  const [displayName, setDisplayName] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [nextAction, setNextAction] = useState(null);
   const [createdCode, setCreatedCode] = useState(null);
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState("");
   const [joinError, setJoinError] = useState("");
   const [validating, setValidating] = useState(false);
 
+  const trimmedName = displayName.trim();
+  const canProceed = trimmedName.length >= 2;
+
   const handleCreateRoom = async () => {
     const code = generateRoomCode();
     setCreatedCode(code);
     setStep("create");
+    setNextAction(null);
     // Register the code server-side so others can validate against it
     await apiRegisterRoom(code);
+  };
+
+  const handleChooseCreate = () => {
+    if (!role) return;
+    setNextAction("create");
+    setStep("name");
+    setNameError("");
+  };
+
+  const handleChooseJoin = () => {
+    if (!role) return;
+    setNextAction("join");
+    setStep("name");
+    setNameError("");
+  };
+
+  const handleNameContinue = async () => {
+    if (!canProceed) {
+      setNameError("Choose a display name with at least 2 characters.");
+      return;
+    }
+
+    if (nextAction === "create") {
+      await handleCreateRoom();
+      return;
+    }
+
+    if (nextAction === "join") {
+      setStep("join");
+      return;
+    }
+
+    setNameError("Please pick Create or Join first.");
   };
 
   const handleCopy = () => {
@@ -138,10 +336,21 @@ function Lobby({ onEnter }) {
       setJoinError("Please enter a valid code");
       return;
     }
-    onEnter(role, code);
+    onEnter(role, code, trimmedName);
   };
 
-  const isMafia = role === "mafia";
+  const handleStartName = () => {
+    if (!role) return;
+    setStep("name");
+    setNameError("");
+  };
+
+  const handleJoinFlow = () => {
+    setStep("join");
+    setJoinError("");
+  };
+
+  const roleName = ROLES.find((r) => r.id === role)?.name || "Player";
 
   return (
     <div
@@ -157,6 +366,7 @@ function Lobby({ onEnter }) {
       }}
     >
       <BgDecorations />
+      <ParticleField count={22} />
 
       <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: "22rem" }}>
         {/* Header */}
@@ -257,7 +467,7 @@ function Lobby({ onEnter }) {
 
               {/* Create Room button */}
               <button
-                onClick={() => role && handleCreateRoom()}
+                onClick={handleChooseCreate}
                 disabled={!role}
                 style={{
                   width: "100%",
@@ -296,7 +506,7 @@ function Lobby({ onEnter }) {
 
               {/* Join Room button */}
               <button
-                onClick={() => role && setStep("join")}
+                onClick={handleChooseJoin}
                 disabled={!role}
                 style={{
                   width: "100%",
@@ -336,6 +546,95 @@ function Lobby({ onEnter }) {
             </>
           )}
 
+          {/* ── Step: Display Name ── */}
+          {step === "name" && (
+            <>
+              <button
+                onClick={() => { setStep("role"); setNameError(""); setNextAction(null); }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "0.72rem",
+                  color: "rgba(255,255,255,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  padding: 0,
+                  marginBottom: "1.25rem",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+              >
+                <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
+                Back
+              </button>
+
+              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
+                Enter a Display Name
+              </p>
+
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  setNameError("");
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleNameContinue(); }}
+                placeholder="Your alias in the room"
+                maxLength={24}
+                style={{
+                  width: "100%",
+                  background: "rgba(255,255,255,0.04)",
+                  border: nameError ? "1px solid rgba(229,62,62,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "0.875rem",
+                  padding: "0.875rem 1rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  color: "#fff",
+                  outline: "none",
+                  caretColor: "#3b82f6",
+                  marginBottom: "0.75rem",
+                  boxSizing: "border-box",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => { if (!nameError) e.target.style.borderColor = "rgba(59,130,246,0.4)"; }}
+                onBlur={(e) => { if (!nameError) e.target.style.borderColor = "rgba(255,255,255,0.1)"; }}
+              />
+
+              {nameError && (
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", color: "#fc8181", marginBottom: "0.75rem" }}>
+                  {nameError}
+                </p>
+              )}
+
+              <button
+                onClick={handleNameContinue}
+                style={{
+                  width: "100%",
+                  padding: "0.875rem",
+                  borderRadius: "0.875rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  background: canProceed ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "rgba(255,255,255,0.04)",
+                  color: canProceed ? "#fff" : "rgba(255,255,255,0.2)",
+                  border: canProceed ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  cursor: canProceed ? "pointer" : "not-allowed",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                Continue
+              </button>
+            </>
+          )}
+
           {/* ── Step: Create ── */}
           {step === "create" && (
             <>
@@ -363,47 +662,39 @@ function Lobby({ onEnter }) {
                 Back
               </button>
 
-              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
+              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1.25rem" }}>
                 Your Room Code
               </p>
 
-              {/* Code display */}
+              {/* Code display letter boxes */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "0.75rem",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "0.875rem",
-                  padding: "0.875rem 1rem",
-                  marginBottom: "0.75rem",
+                  flexWrap: "wrap",
+                  background: "rgba(59,130,246,0.08)",
+                  border: "1px solid rgba(59,130,246,0.2)",
+                  borderRadius: "1rem",
+                  padding: "1rem",
+                  marginBottom: "1rem",
+                  justifyContent: "center",
                 }}
               >
-                <span
-                  style={{
-                    flex: 1,
-                    fontFamily: "'Syne', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "1.6rem",
-                    letterSpacing: "0.3em",
-                    color: "#fff",
-                    userSelect: "all",
-                  }}
-                >
-                  {createdCode}
-                </span>
+                <div style={{ flex: 1, minWidth: "0", display: "flex", justifyContent: "center", maxWidth: "100%" }}>
+                  <RoomCodeDisplay code={createdCode} size="lg" />
+                </div>
                 <button
                   onClick={handleCopy}
                   title="Copy code"
                   style={{
                     flexShrink: 0,
-                    width: "2.25rem",
-                    height: "2.25rem",
-                    borderRadius: "0.625rem",
-                    background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.06)",
-                    border: copied ? "1px solid rgba(74,222,128,0.4)" : "1px solid rgba(255,255,255,0.1)",
-                    color: copied ? "#4ade80" : "rgba(255,255,255,0.5)",
+                    width: "2.5rem",
+                    height: "2.5rem",
+                    borderRadius: "0.75rem",
+                    background: copied ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)",
+                    border: copied ? "1px solid rgba(74,222,128,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                    color: copied ? "#4ade80" : "rgba(255,255,255,0.6)",
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -421,7 +712,7 @@ function Lobby({ onEnter }) {
 
               {/* Enter Room */}
               <button
-                onClick={() => onEnter(role, createdCode)}
+                onClick={() => onEnter(role, createdCode, trimmedName)}
                 style={{
                   width: "100%",
                   padding: "0.875rem",
@@ -571,17 +862,22 @@ function Lobby({ onEnter }) {
 }
 
 // ── Chat Room ────────────────────────────────────────────────────────────────
-function ChatRoom({ role, roomCode, onExit }) {
+function ChatRoom({ role, roomCode, displayName, onExit }) {
   const [messages, setMessages] = useState([]);
   const [members, setMembers] = useState([]);
+  const [typingMembers, setTypingMembers] = useState([]);
+  const [reactions, setReactions] = useState({});
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [pusherError, setPusherError] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const isTypingRef = useRef(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const pusherRef = useRef(null);
   const channelRef = useRef(null);
   const joinedRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
 
   const pusherChannel = `room-${roomCode}`;
 
@@ -620,13 +916,29 @@ function ChatRoom({ role, roomCode, onExit }) {
           setMembers(data.members);
         } else if (data) {
           setMembers((prev) => {
-            const idx = prev.findLastIndex((m) => m.role === data.role);
-            if (idx === -1) return prev;
+            if (!data.displayName && !data.role) return prev;
             const next = [...prev];
-            next.splice(idx, 1);
+            // Prefer removing by displayName when available
+            if (data.displayName) {
+              const idx = next.findIndex((m) => m.displayName === data.displayName);
+              if (idx !== -1) {
+                next.splice(idx, 1);
+                return next;
+              }
+            }
+            // Fallback: remove the last member with the same role
+            if (data.role) {
+              for (let i = next.length - 1; i >= 0; i--) {
+                if (next[i].role === data.role) {
+                  next.splice(i, 1);
+                  return next;
+                }
+              }
+            }
             return next;
           });
         }
+        setTypingMembers((prev) => prev.filter((member) => member.displayName !== data?.displayName));
         setMessages((prev) => [
           ...prev,
           { type: "system", text: `${data?.displayName || "Someone"} left the room`, timestamp: data?.timestamp || Date.now() },
@@ -635,6 +947,25 @@ function ChatRoom({ role, roomCode, onExit }) {
 
       channel.bind("new-message", (data) => {
         setMessages((prev) => [...prev, { ...data, type: "message" }]);
+      });
+
+      channel.bind("typing-update", (data) => {
+        if (!data || data.displayName === displayName) return;
+        setTypingMembers((prev) => {
+          if (!data.isTyping) {
+            return prev.filter((member) => member.displayName !== data.displayName);
+          }
+          if (prev.some((member) => member.displayName === data.displayName)) return prev;
+          return [...prev, { displayName: data.displayName, role: data.role }];
+        });
+      });
+
+      channel.bind("message-reaction", (data) => {
+        if (!data?.messageId) return;
+        setReactions((prev) => ({
+          ...prev,
+          [data.messageId]: [...(prev[data.messageId] || []), { emoji: data.emoji, displayName: data.displayName }],
+        }));
       });
 
       // Announce join once the Pusher subscription is fully live.
@@ -647,7 +978,7 @@ function ChatRoom({ role, roomCode, onExit }) {
         const doJoin = () => {
           if (joined) return;
           joined = true;
-          apiJoin(role, roomCode);
+          apiJoin(role, roomCode, displayName);
         };
         channel.bind("pusher:subscription_succeeded", doJoin);
         setTimeout(doJoin, 300);
@@ -669,17 +1000,64 @@ function ChatRoom({ role, roomCode, onExit }) {
   }, [messages]);
 
   useEffect(() => {
-    const handleUnload = () => apiLeave(role, roomCode);
+    const handleUnload = () => apiLeave(role, roomCode, displayName);
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [role, roomCode]);
+  }, [role, roomCode, displayName]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (isTypingRef.current) {
+        apiTyping(role, roomCode, displayName, false).catch(() => {});
+      }
+    };
+  }, [role, roomCode, displayName]);
+
+  const flushTyping = () => {
+    if (!isTypingRef.current) return;
+    isTypingRef.current = false;
+    setIsTyping(false);
+    apiTyping(role, roomCode, displayName, false).catch(() => {});
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  };
+
+  const handleInputChange = (value) => {
+    setInput(value);
+    const normalized = value.trim();
+    if (!normalized) {
+      flushTyping();
+      return;
+    }
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      setIsTyping(true);
+      apiTyping(role, roomCode, displayName, true).catch(() => {});
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      setIsTyping(false);
+      apiTyping(role, roomCode, displayName, false).catch(() => {});
+      typingTimeoutRef.current = null;
+    }, 1200);
+  };
 
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
     setSending(true);
     setInput("");
-    await apiMessage(text, role, roomCode);
+    flushTyping();
+    await apiMessage(text, role, roomCode, displayName);
     setSending(false);
     inputRef.current?.focus();
   };
@@ -692,7 +1070,8 @@ function ChatRoom({ role, roomCode, onExit }) {
   };
 
   const handleExit = async () => {
-    await apiLeave(role, roomCode);
+    flushTyping();
+    await apiLeave(role, roomCode, displayName);
     onExit();
   };
 
@@ -766,6 +1145,7 @@ function ChatRoom({ role, roomCode, onExit }) {
         overflow: "hidden",
       }}
     >
+      <ParticleField count={18} />
       {/* Top glow */}
       <div
         style={{
@@ -825,7 +1205,7 @@ function ChatRoom({ role, roomCode, onExit }) {
           </button>
 
           {/* Title + room code */}
-          <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             <div
               style={{
                 fontFamily: "'Abril Fatface', serif",
@@ -839,24 +1219,29 @@ function ChatRoom({ role, roomCode, onExit }) {
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
+                textAlign: "center",
               }}
             >
               Mafia Empire
             </div>
-            {/* Room code subtle badge */}
+            {/* Room code badge */}
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.3rem",
+                justifyContent: "center",
+                gap: "0.25rem",
                 marginTop: "0.2rem",
-                padding: "0.15rem 0.5rem",
+                padding: "0.15rem 0.4rem",
                 borderRadius: "999px",
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.07)",
+                overflow: "hidden",
+                maxWidth: "100%",
+                alignSelf: "center",
               }}
             >
-              <i className="fa-solid fa-hashtag" style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.2)" }} />
+              <i className="fa-solid fa-hashtag" style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
               <span
                 style={{
                   fontFamily: "'Syne', sans-serif",
@@ -864,6 +1249,9 @@ function ChatRoom({ role, roomCode, onExit }) {
                   fontSize: "0.62rem",
                   letterSpacing: "0.18em",
                   color: "rgba(255,255,255,0.28)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {roomCode}
@@ -903,36 +1291,104 @@ function ChatRoom({ role, roomCode, onExit }) {
           padding: "1rem",
           display: "flex",
           flexDirection: "column",
-          gap: "0.375rem",
+          gap: "0.75rem",
           position: "relative",
           zIndex: 10,
         }}
       >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.55rem 0.85rem",
+              borderRadius: "999px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.72)" }}>
+              You are <strong style={{ color: "#fff" }}>{displayName}</strong>
+            </span>
+          </div>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              padding: "0.55rem 0.85rem",
+              borderRadius: "999px",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            <i className="fa-solid fa-users" style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)" }} />
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
+              {members.length} in room
+            </span>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+          {members.map((member, idx) => {
+            const memberRole = ROLES.find((r) => r.id === member.role) || { color: "#fff", bg: "rgba(255,255,255,0.06)" };
+            return (
+              <span
+                key={`${member.displayName}-${idx}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  padding: "0.45rem 0.75rem",
+                  borderRadius: "999px",
+                  background: memberRole.bg,
+                  color: memberRole.color,
+                  border: `1px solid ${memberRole.border}`,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "0.72rem",
+                }}
+              >
+                <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "999px", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.08)", color: memberRole.color, fontWeight: 700 }}>
+                  {getInitials(member.displayName)}
+                </span>
+                {member.displayName}
+              </span>
+            );
+          })}
+        </div>
+
+
         {messages.length === 0 && (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "0.5rem" }}>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "1rem", color: "rgba(255,255,255,0.12)" }}>
-              The room is quiet.
-            </p>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.08)" }}>
-              Be the first to speak.
-            </p>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", textAlign: "center", padding: "2rem" }}>
+            <div style={{ fontSize: "3rem", color: "rgba(255,255,255,0.08)" }}>
+              <i className="fa-solid fa-comments" />
+            </div>
+            <div>
+              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "rgba(255,255,255,0.15)", margin: "0 0 0.5rem 0" }}>
+                The room awaits...
+              </p>
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.08)", margin: 0, lineHeight: 1.5 }}>
+                Break the silence. Send the first message.
+              </p>
+            </div>
           </div>
         )}
 
         {messages.map((msg, i) => {
           if (msg.type === "system") {
             return (
-              <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.5rem 0" }}>
+              <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.75rem 0", animation: "message-fade-in 0.4s ease" }}>
                 <span
+                  className="system-message"
                   style={{
                     fontFamily: "'DM Sans', sans-serif",
                     fontSize: "0.72rem",
                     fontStyle: "italic",
-                    color: "rgba(255,255,255,0.5)",
-                    padding: "0.3rem 1rem",
+                    color: "rgba(255,255,255,0.45)",
+                    padding: "0.5rem 1.25rem",
                     borderRadius: "999px",
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.08)",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.4rem",
@@ -945,38 +1401,90 @@ function ChatRoom({ role, roomCode, onExit }) {
           }
 
           const msgRoleObj = ROLES.find((r) => r.id === msg.role) || {
+            name: "Unknown",
+            icon: "fa-question",
             color: "#60a5fa",
-            border: "rgba(59,130,246,0.45)"
+            border: "rgba(59,130,246,0.45)",
+            bg: "rgba(59,130,246,0.12)",
           };
 
+          const initials = getInitials(msg.sender);
+
           return (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.25rem", padding: "0 0.25rem" }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.08em", color: msgRoleObj.color }}>
-                  {msg.sender}
-                </span>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.65rem", color: "rgba(255,255,255,0.18)" }}>
-                  {formatTime(msg.timestamp)}
-                </span>
-              </div>
+            <div key={i} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", animation: "message-slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)" }}>
+              {/* Avatar */}
               <div
                 style={{
-                  display: "inline-block",
-                  width: "fit-content",
-                  maxWidth: "min(75vw, 480px)",
-                  alignSelf: "flex-start",
-                  background: "rgba(255,255,255,0.04)",
-                  backdropFilter: "blur(8px)",
-                  borderRadius: "0.75rem",
-                  borderTopLeftRadius: "0.25rem",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  borderLeft: `2px solid ${msgRoleObj.border}`,
-                  padding: "0.625rem 0.875rem",
+                  width: "2.25rem",
+                  height: "2.25rem",
+                  borderRadius: "0.625rem",
+                  background: msgRoleObj.bg,
+                  border: `1px solid ${msgRoleObj.border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  marginTop: "0.2rem",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "0.7rem",
+                  color: msgRoleObj.color,
+                  position: "relative",
                 }}
               >
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.875rem", lineHeight: 1.55, color: "rgba(255,255,255,0.85)", margin: 0, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
-                  {msg.text}
-                </p>
+                {initials}
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "-2px",
+                    right: "-2px",
+                    width: "0.55rem",
+                    height: "0.55rem",
+                    borderRadius: "50%",
+                    background: msgRoleObj.color,
+                    border: "1px solid #040d1a",
+                  }}
+                  title={msgRoleObj.name}
+                />
+              </div>
+
+              {/* Message bubble + reactions */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", padding: "0 0.25rem" }}>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", letterSpacing: "0.05em", color: msgRoleObj.color }}>
+                    {msg.sender}
+                  </span>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.65rem", letterSpacing: "0.02em", color: "rgba(255,255,255,0.3)" }}>
+                    - {msgRoleObj.name}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "0.35rem", alignItems: "flex-start" }}>
+                  <div
+                    className="message-bubble"
+                    style={{
+                      display: "inline-block",
+                      width: "fit-content",
+                      maxWidth: "min(68vw, 420px)",
+                      background: "rgba(255,255,255,0.03)",
+                      backdropFilter: "blur(12px)",
+                      borderRadius: "0.875rem",
+                      border: `1px solid ${msgRoleObj.border}`,
+                      borderLeft: `3px solid ${msgRoleObj.color}`,
+                      padding: "0.75rem 1rem",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.45rem", flexWrap: "wrap" }}>
+                      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.9rem", lineHeight: 1.6, color: "rgba(255,255,255,0.9)", margin: 0, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                        {msg.text}
+                      </p>
+                      <span style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.28)", whiteSpace: "nowrap" }}>
+                        {formatTime(msg.timestamp)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -997,12 +1505,25 @@ function ChatRoom({ role, roomCode, onExit }) {
           zIndex: 10,
         }}
       >
+        {/* Typing indicator - above input */}
+        {typingMembers.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: "0.4rem", marginBottom: "0.7rem", fontSize: "0.75rem", color: "rgba(200,200,200,0.6)", fontStyle: "italic" }}>
+            <span style={{ fontFamily: "'Syne', sans-serif", color: "rgba(255,255,255,0.7)" }}>
+              {typingMembers.map((tm) => tm.displayName).join(", ")} is typing
+            </span>
+            <span style={{ display: "flex", gap: "0.15rem", animation: "pulse 1.5s infinite" }}>
+              <span style={{ animation: "pulse 1.5s infinite 0s", display: "inline-block" }}>•</span>
+              <span style={{ animation: "pulse 1.5s infinite 0.2s", display: "inline-block" }}>•</span>
+              <span style={{ animation: "pulse 1.5s infinite 0.4s", display: "inline-block" }}>•</span>
+            </span>
+          </div>
+        )}
         <div style={{ display: "flex", gap: "0.625rem", alignItems: "center" }}>
           <input
             ref={inputRef}
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Type a message..."
             maxLength={500}
@@ -1010,26 +1531,32 @@ function ChatRoom({ role, roomCode, onExit }) {
               flex: 1,
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: "0.75rem",
-              padding: "0.75rem 1rem",
+              borderRadius: "0.875rem",
+              padding: "0.85rem 1.1rem",
               fontFamily: "'DM Sans', sans-serif",
-              fontSize: "0.875rem",
-              color: "rgba(255,255,255,0.85)",
+              fontSize: "0.9rem",
+              color: "rgba(255,255,255,0.9)",
               outline: "none",
               caretColor: "#3b82f6",
-              transition: "border-color 0.2s ease",
+              transition: "all 0.2s ease",
             }}
-            onFocus={(e) => { e.target.style.borderColor = "rgba(59,130,246,0.4)"; }}
-            onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.07)"; }}
+            onFocus={(e) => { 
+              e.target.style.borderColor = "rgba(59,130,246,0.4)";
+              e.target.style.background = "rgba(255,255,255,0.06)";
+            }}
+            onBlur={(e) => { 
+              e.target.style.borderColor = "rgba(255,255,255,0.07)";
+              e.target.style.background = "rgba(255,255,255,0.04)";
+            }}
           />
           <button
             onClick={sendMessage}
             disabled={!input.trim() || sending}
             style={{
               flexShrink: 0,
-              width: "2.75rem",
-              height: "2.75rem",
-              borderRadius: "0.75rem",
+              width: "2.85rem",
+              height: "2.85rem",
+              borderRadius: "0.875rem",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -1041,8 +1568,8 @@ function ChatRoom({ role, roomCode, onExit }) {
             }}
             onMouseEnter={(e) => {
               if (input.trim()) {
-                e.currentTarget.style.transform = "scale(1.03)";
-                e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.4)";
+                e.currentTarget.style.transform = "scale(1.05)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(37,99,235,0.4)";
               }
             }}
             onMouseLeave={(e) => {
@@ -1050,12 +1577,18 @@ function ChatRoom({ role, roomCode, onExit }) {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            <i className="fa-solid fa-paper-plane" style={{ fontSize: "0.85rem" }} />
+            <i className="fa-solid fa-paper-plane" style={{ fontSize: "0.9rem" }} />
           </button>
         </div>
-        <p style={{ textAlign: "center", marginTop: "0.5rem", fontFamily: "'DM Sans', sans-serif", fontSize: "0.65rem", color: "rgba(255,255,255,0.13)" }}>
-          Enter to send
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.6rem", paddingX: "0.25rem" }}>
+          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.65rem", color: "rgba(255,255,255,0.2)", margin: 0 }}>
+            <i className="fa-solid fa-keyboard" style={{ marginRight: "0.3rem", opacity: 0.7 }} />
+            Enter to send
+          </p>
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.65rem", fontWeight: 600, color: input.length > 450 ? "#f59e0b" : input.length > 480 ? "#ef4444" : "rgba(255,255,255,0.25)", transition: "color 0.2s" }}>
+            {input.length} / 500
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1066,19 +1599,22 @@ export default function App() {
   const [screen, setScreen] = useState("lobby");
   const [role, setRole] = useState(null);
   const [roomCode, setRoomCode] = useState(null);
+  const [displayName, setDisplayName] = useState("");
 
-  const handleEnter = (selectedRole, code) => {
+  const handleEnter = (selectedRole, code, name) => {
     setRole(selectedRole);
     setRoomCode(code);
+    setDisplayName(name);
     setScreen("chat");
   };
 
   const handleExit = () => {
     setRole(null);
     setRoomCode(null);
+    setDisplayName("");
     setScreen("lobby");
   };
 
   if (screen === "lobby") return <Lobby onEnter={handleEnter} />;
-  return <ChatRoom role={role} roomCode={roomCode} onExit={handleExit} />;
+  return <ChatRoom role={role} roomCode={roomCode} displayName={displayName} onExit={handleExit} />;
 }
