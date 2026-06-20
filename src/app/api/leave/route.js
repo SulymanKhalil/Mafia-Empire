@@ -14,7 +14,7 @@ export async function POST(req) {
       doctor: "Doctor"
     };
     const displayName = customName?.trim() || roleNames[role] || "Unknown";
-    removeMember(roomCode, role);
+    removeMember(roomCode, role, displayName);
 
     const pusher = getPusherServer();
     const channel = getRoomChannel(roomCode);

@@ -12,7 +12,9 @@ const activeRooms = globalForRooms.activeRooms;
 export function registerRoom(code) {
   const key = code.toUpperCase();
   console.log("[Room Store] Registering room:", key);
-  activeRooms.set(key, []);
+  if (!activeRooms.has(key)) {
+    activeRooms.set(key, []);
+  }
 }
 
 export function isValidRoom(code) {
@@ -34,12 +36,20 @@ export function addMember(code, member) {
   members.push(member);
 }
 
-export function removeMember(code, role) {
+export function removeMember(code, role, displayName) {
   const key = code.toUpperCase();
-  console.log("[Room Store] Removing member from room:", key, "role:", role);
+  console.log("[Room Store] Removing member from room:", key, "role:", role, "displayName:", displayName);
   if (activeRooms.has(key)) {
     const members = activeRooms.get(key);
-    const idx = members.findIndex((m) => m.role === role);
+    // Try to remove by displayName first (more specific when multiple roles exist)
+    let idx = -1;
+    if (displayName) {
+      idx = members.findIndex((m) => m.displayName === displayName);
+    }
+    // Fallback to role if displayName doesn't match
+    if (idx === -1) {
+      idx = members.findIndex((m) => m.role === role);
+    }
     if (idx !== -1) {
       members.splice(idx, 1);
     }

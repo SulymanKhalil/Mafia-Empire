@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPusherServer, getRoomChannel } from "@/lib/pusher-server";
-import { addMember, getMembers } from "@/lib/room-store";
+import { addMember, getMembers, registerRoom } from "@/lib/room-store";
 
 export async function POST(req) {
   try {
@@ -15,6 +15,8 @@ export async function POST(req) {
       doctor: "Doctor"
     };
     const displayName = customName?.trim() || roleNames[role] || "Unknown";
+    // Auto-register the room if it doesn't exist
+    registerRoom(roomCode);
     addMember(roomCode, { role, displayName });
 
     const pusher = getPusherServer();
