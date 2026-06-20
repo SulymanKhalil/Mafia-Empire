@@ -584,7 +584,7 @@ function Lobby({ onEnter }) {
                   setNameError("");
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleNameContinue(); }}
-                placeholder="Your alias in the room"
+                placeholder="Eg: ShadowFox, NightOwl, SilentWhisper"
                 maxLength={24}
                 style={{
                   width: "100%",
