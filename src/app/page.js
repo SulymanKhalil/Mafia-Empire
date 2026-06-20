@@ -584,7 +584,7 @@ function Lobby({ onEnter }) {
                   setNameError("");
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleNameContinue(); }}
-                placeholder="Eg: ShadowFox, NightOwl, SilentWhisper"
+                placeholder="Eg: ShadowFox"
                 maxLength={24}
                 style={{
                   width: "100%",
