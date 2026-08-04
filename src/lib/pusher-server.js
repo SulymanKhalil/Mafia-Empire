@@ -16,5 +16,5 @@ export function getPusherServer() {
 }
 
 export function getRoomChannel(roomCode) {
-  return `room-${roomCode}`;
+  return `presence-room-${roomCode}`;
 }

@@ -52,15 +52,17 @@ NEXT_PUBLIC_PUSHER_CLUSTER = your_cluster   (same as PUSHER_CLUSTER)
 
 5. **Deploy site** — done ✅
 
----
-
 ## How it works
 
-- Users join the lobby, pick **Mafia** or **Civilian**, click Enter
-- `POST /api/join` triggers a Pusher `member-joined` event to all clients
-- `POST /api/message` triggers `new-message` to all clients
-- `POST /api/leave` triggers `member-left` when user exits or closes tab
-- All message senders show as "Mafia" or "Civilian" — fully anonymous
+- Users join the lobby, pick a role (**Mafia**, **Civilian**, **Detective**, or **Doctor**), enter a display name, and click Enter.
+- `POST /api/register-room` registers the room code in the server-side memory store when creating a game.
+- `POST /api/validate-room` checks if a room code exists in the store before allowing a player to join.
+- `POST /api/join` registers the player to the room store and triggers a Pusher `member-joined` event to all clients in the room channel.
+- `POST /api/message` triggers a `new-message` event to distribute chat messages.
+- `POST /api/typing` triggers a `typing-update` event to sync real-time typing indicators.
+- `POST /api/reaction` triggers a `message-reaction` event to attach emoji reactions to messages.
+- `POST /api/leave` removes the player from the room store and triggers `member-left` when a user exits or closes the tab.
+- All message senders are identified anonymously by their chosen role and display name.
 
 ---
 

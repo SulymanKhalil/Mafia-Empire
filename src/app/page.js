@@ -876,10 +876,9 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
   const inputRef = useRef(null);
   const pusherRef = useRef(null);
   const channelRef = useRef(null);
-  const joinedRef = useRef(false);
   const typingTimeoutRef = useRef(null);
 
-  const pusherChannel = `room-${roomCode}`;
+  const pusherChannel = `presence-room-${roomCode}`;
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
@@ -894,54 +893,55 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
     try {
       pusherRef.current = new Pusher(key, {
         cluster: cluster,
+        channelAuthorization: {
+          endpoint: "/api/pusher/auth",
+          transport: "ajax",
+          params: {
+            displayName,
+            role,
+          },
+        },
       });
 
       const channel = pusherRef.current.subscribe(pusherChannel);
       channelRef.current = channel;
 
-      channel.bind("member-joined", (data) => {
-        if (data && Array.isArray(data.members)) {
-          setMembers(data.members);
-        } else if (data) {
-          setMembers((prev) => [...prev, { displayName: data.displayName, role: data.role }]);
-        }
+      channel.bind("pusher:subscription_succeeded", (presenceMembers) => {
+        const memberList = [];
+        presenceMembers.each((member) => {
+          memberList.push({
+            id: member.id,
+            displayName: member.info.displayName,
+            role: member.info.role,
+          });
+        });
+        setMembers(memberList);
+      });
+
+      channel.bind("pusher:member_added", (member) => {
+        setMembers((prev) => {
+          if (prev.some((m) => m.id === member.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: member.id,
+              displayName: member.info.displayName,
+              role: member.info.role,
+            },
+          ];
+        });
         setMessages((prev) => [
           ...prev,
-          { type: "system", text: `${data?.displayName || "Someone"} joined the room`, timestamp: data?.timestamp || Date.now() },
+          { type: "system", text: `${member.info.displayName} joined the room`, timestamp: Date.now() },
         ]);
       });
 
-      channel.bind("member-left", (data) => {
-        if (data && Array.isArray(data.members)) {
-          setMembers(data.members);
-        } else if (data) {
-          setMembers((prev) => {
-            if (!data.displayName && !data.role) return prev;
-            const next = [...prev];
-            // Prefer removing by displayName when available
-            if (data.displayName) {
-              const idx = next.findIndex((m) => m.displayName === data.displayName);
-              if (idx !== -1) {
-                next.splice(idx, 1);
-                return next;
-              }
-            }
-            // Fallback: remove the last member with the same role
-            if (data.role) {
-              for (let i = next.length - 1; i >= 0; i--) {
-                if (next[i].role === data.role) {
-                  next.splice(i, 1);
-                  return next;
-                }
-              }
-            }
-            return next;
-          });
-        }
-        setTypingMembers((prev) => prev.filter((member) => member.displayName !== data?.displayName));
+      channel.bind("pusher:member_removed", (member) => {
+        setMembers((prev) => prev.filter((m) => m.id !== member.id));
+        setTypingMembers((prev) => prev.filter((tm) => tm.displayName !== member.info.displayName));
         setMessages((prev) => [
           ...prev,
-          { type: "system", text: `${data?.displayName || "Someone"} left the room`, timestamp: data?.timestamp || Date.now() },
+          { type: "system", text: `${member.info.displayName} left the room`, timestamp: Date.now() },
         ]);
       });
 
@@ -968,22 +968,6 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         }));
       });
 
-      // Announce join once the Pusher subscription is fully live.
-      // On fast connections subscription_succeeded may fire before we call
-      // .bind(), so we also set a 300ms timeout as a guaranteed fallback.
-      // A `joined` flag ensures apiJoin is called exactly once either way.
-      if (!joinedRef.current) {
-        joinedRef.current = true;
-        let joined = false;
-        const doJoin = () => {
-          if (joined) return;
-          joined = true;
-          apiJoin(role, roomCode, displayName);
-        };
-        channel.bind("pusher:subscription_succeeded", doJoin);
-        setTimeout(doJoin, 300);
-      }
-
       return () => {
         channel.unbind_all();
         pusherRef.current.unsubscribe(pusherChannel);
@@ -998,12 +982,6 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    const handleUnload = () => apiLeave(role, roomCode, displayName);
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [role, roomCode, displayName]);
 
   useEffect(() => {
     return () => {
@@ -1069,9 +1047,8 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
     }
   };
 
-  const handleExit = async () => {
+  const handleExit = () => {
     flushTyping();
-    await apiLeave(role, roomCode, displayName);
     onExit();
   };
 
@@ -1377,7 +1354,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         {messages.map((msg, i) => {
           if (msg.type === "system") {
             return (
-              <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.75rem 0", animation: "message-fade-in 0.4s ease" }}>
+              <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.225rem 0", animation: "message-fade-in 0.4s ease" }}>
                 <span
                   className="system-message"
                   style={{
@@ -1564,17 +1541,6 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
               border: input.trim() ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
               color: input.trim() ? "#fff" : "rgba(255,255,255,0.2)",
               cursor: input.trim() ? "pointer" : "not-allowed",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (input.trim()) {
-                e.currentTarget.style.transform = "scale(1.05)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(37,99,235,0.4)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.boxShadow = "none";
             }}
           >
             <i className="fa-solid fa-paper-plane" style={{ fontSize: "0.9rem" }} />
