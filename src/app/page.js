@@ -805,7 +805,7 @@ function Lobby({ onEnter }) {
           )}
         </div>
 
-        <p style={{ textAlign: "center", marginTop: "1.5rem", fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.12)" }}>
+        <p style={{ textAlign: "center", marginTop: "1.5rem", fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.3)" }}>
           Warning: prolonged eye contact may result in elimination.
         </p>
       </div>
@@ -1460,7 +1460,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
               justifyContent: "center",
               background: input.trim() ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
               border: input.trim() ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
-              color: input.trim() ? "#fff" : "rgba(255,255,255,0.2)",
+              color: input.trim() ? "#000" : "rgba(255,255,255,0.2)",
               cursor: input.trim() ? "pointer" : "not-allowed",
             }}
           >
