@@ -111,14 +111,14 @@ function RoomCodeDisplay({ code, size = "sm" }) {
             placeItems: "center",
             borderRadius: "0.4rem",
             background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(14,165,233,0.3)",
+            border: "1px solid rgba(255,255,255,0.15)",
             fontFamily: "'Syne', sans-serif",
             fontWeight: 700,
             fontSize,
-            color: "#0ea5e9",
+            color: "#ffffff",
             letterSpacing: "0.08em",
             transition: "all 0.2s ease",
-            boxShadow: "0 0 8px rgba(14,165,233,0.1)",
+            boxShadow: "none",
             minWidth: 0,
             maxWidth: "2.5rem",
             justifySelf: "center",
@@ -237,8 +237,7 @@ function BgDecorations() {
           position: "fixed",
           inset: 0,
           pointerEvents: "none",
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(14,165,233,0.25) 0%, transparent 70%)",
+          background: "none",
         }}
       />
       <div
@@ -360,7 +359,7 @@ function Lobby({ onEnter }) {
         alignItems: "center",
         justifyContent: "center",
         padding: "1rem",
-        background: "#0b2240",
+        background: "#000000",
         position: "relative",
         overflow: "hidden",
       }}
@@ -386,10 +385,7 @@ function Lobby({ onEnter }) {
               fontSize: "2.75rem",
               lineHeight: 1,
               letterSpacing: "0.01em",
-              background: "linear-gradient(135deg, #ffffff 0%, #7dd3fc 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
+              color: "#ffffff",
               marginBottom: "0.5rem",
             }}
           >
@@ -403,7 +399,7 @@ function Lobby({ onEnter }) {
         {/* Card */}
         <div
           style={{
-            background: "rgba(22,50,85,0.75)",
+            background: "rgba(15,15,15,0.85)",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
             border: "1px solid rgba(255,255,255,0.08)",
@@ -478,26 +474,15 @@ function Lobby({ onEnter }) {
                   fontSize: "0.8rem",
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  background: role ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)" : "rgba(255,255,255,0.04)",
-                  color: role ? "#fff" : "rgba(255,255,255,0.2)",
-                  border: role ? "1px solid rgba(14,165,233,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  background: role ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
+                  color: role ? "#000" : "rgba(255,255,255,0.2)",
+                  border: role ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
                   cursor: role ? "pointer" : "not-allowed",
-                  transition: "all 0.2s ease",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "0.4rem",
                   marginBottom: "0.625rem",
-                }}
-                onMouseEnter={(e) => {
-                  if (role) {
-                    e.currentTarget.style.transform = "scale(1.03)";
-                    e.currentTarget.style.boxShadow = "0 6px 24px rgba(14,165,233,0.4)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
                 <i className="fa-solid fa-plus" style={{ fontSize: "0.65rem" }} />
@@ -521,23 +506,10 @@ function Lobby({ onEnter }) {
                   color: role ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)",
                   border: role ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(255,255,255,0.06)",
                   cursor: role ? "pointer" : "not-allowed",
-                  transition: "all 0.2s ease",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "0.4rem",
-                }}
-                onMouseEnter={(e) => {
-                  if (role) {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.07)";
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-                    e.currentTarget.style.transform = "scale(1.03)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                  e.currentTarget.style.borderColor = role ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)";
-                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 <i className="fa-solid fa-right-to-bracket" style={{ fontSize: "0.65rem" }} />
@@ -584,7 +556,7 @@ function Lobby({ onEnter }) {
                   setNameError("");
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleNameContinue(); }}
-                placeholder="Eg: ShadowFox"
+                placeholder="ie: Shadow Fox"
                 maxLength={24}
                 style={{
                   width: "100%",
@@ -597,12 +569,12 @@ function Lobby({ onEnter }) {
                   fontSize: "1rem",
                   color: "#fff",
                   outline: "none",
-                  caretColor: "#0ea5e9",
+                  caretColor: "#ffffff",
                   marginBottom: "0.75rem",
                   boxSizing: "border-box",
                   transition: "border-color 0.2s ease",
                 }}
-                onFocus={(e) => { if (!nameError) e.target.style.borderColor = "rgba(14,165,233,0.4)"; }}
+                onFocus={(e) => { if (!nameError) e.target.style.borderColor = "rgba(255,255,255,0.3)"; }}
                 onBlur={(e) => { if (!nameError) e.target.style.borderColor = "rgba(255,255,255,0.1)"; }}
               />
 
@@ -623,9 +595,9 @@ function Lobby({ onEnter }) {
                   fontSize: "0.8rem",
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  background: canProceed ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)" : "rgba(255,255,255,0.04)",
-                  color: canProceed ? "#fff" : "rgba(255,255,255,0.2)",
-                  border: canProceed ? "1px solid rgba(14,165,233,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  background: canProceed ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
+                  color: canProceed ? "#000" : "rgba(255,255,255,0.2)",
+                  border: canProceed ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
                   cursor: canProceed ? "pointer" : "not-allowed",
                   transition: "all 0.2s ease",
                 }}
@@ -673,8 +645,8 @@ function Lobby({ onEnter }) {
                   alignItems: "center",
                   gap: "0.75rem",
                   flexWrap: "wrap",
-                  background: "rgba(14,165,233,0.08)",
-                  border: "1px solid rgba(14,165,233,0.2)",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: "1rem",
                   padding: "1rem",
                   marginBottom: "1rem",
@@ -722,23 +694,14 @@ function Lobby({ onEnter }) {
                   fontSize: "0.8rem",
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
-                  color: "#fff",
-                  border: "1px solid rgba(14,165,233,0.5)",
+                  background: "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)",
+                  color: "#000",
+                  border: "1px solid rgba(255,255,255,0.15)",
                   cursor: "pointer",
-                  transition: "all 0.2s ease",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "0.5rem",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(14,165,233,0.4)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
                 Enter Room →
@@ -799,13 +762,13 @@ function Lobby({ onEnter }) {
                   letterSpacing: "0.35em",
                   color: "#fff",
                   outline: "none",
-                  caretColor: "#0ea5e9",
+                  caretColor: "#ffffff",
                   textAlign: "center",
                   marginBottom: "0.5rem",
                   boxSizing: "border-box",
                   transition: "border-color 0.2s ease",
                 }}
-                onFocus={(e) => { if (!joinError) e.target.style.borderColor = "rgba(14,165,233,0.4)"; }}
+                onFocus={(e) => { if (!joinError) e.target.style.borderColor = "rgba(255,255,255,0.3)"; }}
                 onBlur={(e) => { if (!joinError) e.target.style.borderColor = "rgba(255,255,255,0.1)"; }}
               />
 
@@ -830,21 +793,10 @@ function Lobby({ onEnter }) {
                   fontSize: "0.8rem",
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  background: joinInput.length === 4 && !validating ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)" : "rgba(255,255,255,0.04)",
-                  color: joinInput.length === 4 && !validating ? "#fff" : "rgba(255,255,255,0.2)",
-                  border: joinInput.length === 4 && !validating ? "1px solid rgba(14,165,233,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  background: joinInput.length === 4 && !validating ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
+                  color: joinInput.length === 4 && !validating ? "#000" : "rgba(255,255,255,0.2)",
+                  border: joinInput.length === 4 && !validating ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
                   cursor: joinInput.length === 4 && !validating ? "pointer" : "not-allowed",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (joinInput.length === 4 && !validating) {
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 6px 24px rgba(14,165,233,0.4)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
                 {validating ? "Checking..." : "Enter Room →"}
@@ -1079,7 +1031,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           justifyContent: "center",
           flexDirection: "column",
           gap: "1.5rem",
-          background: "#0b2240",
+          background: "#000000",
           color: "#fff",
           padding: "2rem",
           textAlign: "center",
@@ -1121,7 +1073,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         height: "100dvh",
         display: "flex",
         flexDirection: "column",
-        background: "#0b2240",
+        background: "#000000",
         position: "relative",
         overflow: "hidden",
       }}
@@ -1133,14 +1085,14 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           position: "fixed",
           inset: 0,
           pointerEvents: "none",
-          background: "radial-gradient(ellipse 100% 35% at 50% 0%, rgba(14,165,233,0.2) 0%, transparent 60%)",
+          background: "none",
         }}
       />
 
       {/* ── Header ── */}
       <div
         style={{
-          background: "rgba(15,35,62,0.85)",
+          background: "rgba(15,15,15,0.9)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -1193,10 +1145,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
                 fontWeight: 400,
                 fontSize: "1.1rem",
                 letterSpacing: "0.03em",
-                background: "linear-gradient(135deg, #ffffff 0%, #38bdf8 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
+                color: "#ffffff",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1391,7 +1340,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
                     height: "0.55rem",
                     borderRadius: "50%",
                     background: msgRoleObj.color,
-                    border: "1px solid #0b2240",
+                    border: "1px solid #000000",
                   }}
                   title={msgRoleObj.name}
                 />
@@ -1444,7 +1393,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
       {/* ── Input ── */}
       <div
         style={{
-          background: "rgba(12,26,48,0.85)",
+          background: "rgba(15,15,15,0.9)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderTop: "1px solid rgba(255,255,255,0.06)",
@@ -1486,11 +1435,11 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
               fontSize: "0.9rem",
               color: "rgba(255,255,255,0.9)",
               outline: "none",
-              caretColor: "#0ea5e9",
+              caretColor: "#ffffff",
               transition: "all 0.2s ease",
             }}
             onFocus={(e) => { 
-              e.target.style.borderColor = "rgba(14,165,233,0.4)";
+              e.target.style.borderColor = "rgba(255,255,255,0.3)";
               e.target.style.background = "rgba(255,255,255,0.06)";
             }}
             onBlur={(e) => { 
@@ -1509,8 +1458,8 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: input.trim() ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)" : "rgba(255,255,255,0.04)",
-              border: input.trim() ? "1px solid rgba(14,165,233,0.5)" : "1px solid rgba(255,255,255,0.06)",
+              background: input.trim() ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
+              border: input.trim() ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
               color: input.trim() ? "#fff" : "rgba(255,255,255,0.2)",
               cursor: input.trim() ? "pointer" : "not-allowed",
             }}
