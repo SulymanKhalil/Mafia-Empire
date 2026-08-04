@@ -69,9 +69,9 @@ if (typeof document !== "undefined") {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function generateRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const chars = "0123456789";
   let code = "";
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 
@@ -86,7 +86,7 @@ function getInitials(name) {
 
 function RoomCodeDisplay({ code, size = "sm" }) {
   const isSm = size === "sm";
-  const chars = (code || "------").split("");
+  const chars = (code || "----").split("");
   const fontSize = isSm ? "0.65rem" : "0.95rem";
 
   return (
@@ -324,9 +324,9 @@ function Lobby({ onEnter }) {
   };
 
   const handleJoinSubmit = async () => {
-    const code = joinInput.trim().toUpperCase();
-    if (code.length !== 6) {
-      setJoinError("Code must be 6 characters");
+    const code = joinInput.trim();
+    if (code.length !== 4) {
+      setJoinError("Code must be 4 digits");
       return;
     }
     setValidating(true);
@@ -360,7 +360,7 @@ function Lobby({ onEnter }) {
         alignItems: "center",
         justifyContent: "center",
         padding: "1rem",
-        background: "#040d1a",
+        background: "#0b1a30",
         position: "relative",
         overflow: "hidden",
       }}
@@ -403,7 +403,7 @@ function Lobby({ onEnter }) {
         {/* Card */}
         <div
           style={{
-            background: "rgba(10,22,40,0.75)",
+            background: "rgba(18,34,60,0.75)",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
             border: "1px solid rgba(255,255,255,0.08)",
@@ -781,12 +781,12 @@ function Lobby({ onEnter }) {
                 type="text"
                 value={joinInput}
                 onChange={(e) => {
-                  setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6));
+                  setJoinInput(e.target.value.replace(/[^0-9]/g, "").slice(0, 4));
                   setJoinError("");
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleJoinSubmit(); }}
-                placeholder="------"
-                maxLength={6}
+                placeholder="----"
+                maxLength={4}
                 style={{
                   width: "100%",
                   background: "rgba(255,255,255,0.04)",
@@ -820,7 +820,7 @@ function Lobby({ onEnter }) {
               {/* Enter Room */}
               <button
                 onClick={handleJoinSubmit}
-                disabled={joinInput.length !== 6 || validating}
+                disabled={joinInput.length !== 4 || validating}
                 style={{
                   width: "100%",
                   padding: "0.875rem",
@@ -830,14 +830,14 @@ function Lobby({ onEnter }) {
                   fontSize: "0.8rem",
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  background: joinInput.length === 6 && !validating ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "rgba(255,255,255,0.04)",
-                  color: joinInput.length === 6 && !validating ? "#fff" : "rgba(255,255,255,0.2)",
-                  border: joinInput.length === 6 && !validating ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
-                  cursor: joinInput.length === 6 && !validating ? "pointer" : "not-allowed",
+                  background: joinInput.length === 4 && !validating ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "rgba(255,255,255,0.04)",
+                  color: joinInput.length === 4 && !validating ? "#fff" : "rgba(255,255,255,0.2)",
+                  border: joinInput.length === 4 && !validating ? "1px solid rgba(59,130,246,0.5)" : "1px solid rgba(255,255,255,0.06)",
+                  cursor: joinInput.length === 4 && !validating ? "pointer" : "not-allowed",
                   transition: "all 0.2s ease",
                 }}
                 onMouseEnter={(e) => {
-                  if (joinInput.length === 6 && !validating) {
+                  if (joinInput.length === 4 && !validating) {
                     e.currentTarget.style.transform = "translateY(-1px)";
                     e.currentTarget.style.boxShadow = "0 6px 24px rgba(37,99,235,0.4)";
                   }
@@ -916,6 +916,10 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           });
         });
         setMembers(memberList);
+        setMessages((prev) => [
+          ...prev,
+          { type: "system", text: `${displayName} joined the room`, timestamp: Date.now() },
+        ]);
       });
 
       channel.bind("pusher:member_added", (member) => {
@@ -1075,7 +1079,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           justifyContent: "center",
           flexDirection: "column",
           gap: "1.5rem",
-          background: "#040d1a",
+          background: "#0b1a30",
           color: "#fff",
           padding: "2rem",
           textAlign: "center",
@@ -1117,7 +1121,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         height: "100dvh",
         display: "flex",
         flexDirection: "column",
-        background: "#040d1a",
+        background: "#0b1a30",
         position: "relative",
         overflow: "hidden",
       }}
@@ -1136,7 +1140,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
       {/* ── Header ── */}
       <div
         style={{
-          background: "rgba(6,15,33,0.85)",
+          background: "rgba(12,26,48,0.85)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -1181,13 +1185,13 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
             Exit
           </button>
 
-          {/* Title + room code */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          {/* Title (Center) */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>
             <div
               style={{
                 fontFamily: "'Abril Fatface', serif",
                 fontWeight: 400,
-                fontSize: "1.05rem",
+                fontSize: "1.1rem",
                 letterSpacing: "0.03em",
                 background: "linear-gradient(135deg, #ffffff 0%, #7fa8d4 100%)",
                 WebkitBackgroundClip: "text",
@@ -1201,61 +1205,36 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
             >
               Mafia Empire
             </div>
-            {/* Room code badge */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.25rem",
-                marginTop: "0.2rem",
-                padding: "0.15rem 0.4rem",
-                borderRadius: "999px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                overflow: "hidden",
-                maxWidth: "100%",
-                alignSelf: "center",
-              }}
-            >
-              <i className="fa-solid fa-hashtag" style={{ fontSize: "0.55rem", color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
-              <span
-                style={{
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "0.62rem",
-                  letterSpacing: "0.18em",
-                  color: "rgba(255,255,255,0.28)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {roomCode}
-              </span>
-            </div>
           </div>
 
-          {/* Role badge */}
+          {/* Room code badge (Right) */}
           <div
             style={{
               flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.25rem",
               padding: "0.375rem 0.75rem",
               borderRadius: "0.625rem",
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 700,
-              fontSize: "0.7rem",
-              letterSpacing: "0.05em",
-              background: currentRoleObj.bg,
-              border: `1px solid ${currentRoleObj.border}`,
-              color: currentRoleObj.color,
-              display: "flex",
-              alignItems: "center",
-              gap: "0.35rem",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.07)",
+              overflow: "hidden",
             }}
           >
-            <i className={`fa-solid ${currentRoleObj.icon}`} style={{ fontSize: "0.65rem" }} />
-            {currentRoleObj.name}
+            <i className="fa-solid fa-hashtag" style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
+            <span
+              style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 700,
+                fontSize: "0.72rem",
+                letterSpacing: "0.12em",
+                color: "rgba(255,255,255,0.4)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {roomCode}
+            </span>
           </div>
         </div>
       </div>
@@ -1286,7 +1265,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
             }}
           >
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.72)" }}>
-              You are <strong style={{ color: "#fff" }}>{displayName}</strong>
+              Playing as <strong style={{ color: "#fff" }}>{displayName}</strong> · <strong style={{ color: currentRoleObj.color }}>{currentRoleObj.name}</strong>
             </span>
           </div>
           <div
@@ -1354,7 +1333,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         {messages.map((msg, i) => {
           if (msg.type === "system") {
             return (
-              <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.225rem 0", animation: "message-fade-in 0.4s ease" }}>
+              <div key={i} style={{ display: "flex", justifyContent: "center", padding: "0.075rem 0", animation: "message-fade-in 0.4s ease" }}>
                 <span
                   className="system-message"
                   style={{
@@ -1362,13 +1341,6 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
                     fontSize: "0.72rem",
                     fontStyle: "italic",
                     color: "rgba(255,255,255,0.45)",
-                    padding: "0.5rem 1.25rem",
-                    borderRadius: "999px",
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.4rem",
                   }}
                 >
                   {msg.text}
@@ -1419,7 +1391,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
                     height: "0.55rem",
                     borderRadius: "50%",
                     background: msgRoleObj.color,
-                    border: "1px solid #040d1a",
+                    border: "1px solid #0b1a30",
                   }}
                   title={msgRoleObj.name}
                 />
@@ -1472,7 +1444,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
       {/* ── Input ── */}
       <div
         style={{
-          background: "rgba(6,15,33,0.85)",
+          background: "rgba(12,26,48,0.85)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderTop: "1px solid rgba(255,255,255,0.06)",
