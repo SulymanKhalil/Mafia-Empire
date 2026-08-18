@@ -212,13 +212,20 @@ async function apiRegisterRoom(roomCode) {
 }
 
 async function apiValidateRoom(roomCode) {
-  const res = await fetch("/api/validate-room", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomCode }),
-  });
-  const data = await res.json();
-  return data.valid === true;
+  try {
+    const res = await fetch("/api/validate-room", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomCode }),
+    });
+    if (!res.ok) {
+      return { valid: false, error: "Server error. Please try again." };
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("apiValidateRoom error:", err);
+    return { valid: false, error: "Network error. Please try again." };
+  }
 }
 
 const ROLES = [
@@ -329,10 +336,10 @@ function Lobby({ onEnter }) {
       return;
     }
     setValidating(true);
-    const valid = await apiValidateRoom(code);
+    const result = await apiValidateRoom(code);
     setValidating(false);
-    if (!valid) {
-      setJoinError("Please enter a valid code");
+    if (!result.valid) {
+      setJoinError(result.error || "Please enter a valid code");
       return;
     }
     onEnter(role, code, trimmedName);

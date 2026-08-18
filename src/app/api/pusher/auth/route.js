@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPusherServer } from "@/lib/pusher-server";
+import { occupyRoom } from "@/lib/room-store";
 
 export async function POST(req) {
   try {
@@ -29,6 +30,13 @@ export async function POST(req) {
     }
 
     const authResponse = pusher.authorizeChannel(socketId, channelName, presenceData);
+    
+    // Mark room as occupied if it is a room presence channel
+    if (channelName.startsWith("presence-room-")) {
+      const roomCode = channelName.substring("presence-room-".length);
+      occupyRoom(roomCode);
+    }
+
     return NextResponse.json(authResponse);
   } catch (err) {
     console.error("[Pusher Auth] Error:", err);

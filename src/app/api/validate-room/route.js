@@ -5,11 +5,12 @@ export async function POST(req) {
   try {
     const { roomCode } = await req.json();
     console.log("[API Validate Room] Validating code:", roomCode);
-    if (!roomCode) return NextResponse.json({ valid: false });
-    const valid = await isValidRoom(roomCode);
-    return NextResponse.json({ valid });
+    if (!roomCode) return NextResponse.json({ valid: false, error: "Room code required" });
+    
+    const result = await isValidRoom(roomCode);
+    return NextResponse.json(result);
   } catch (err) {
     console.error("validate-room error:", err);
-    return NextResponse.json({ error: "server error" }, { status: 500 });
+    return NextResponse.json({ error: "server error", valid: false }, { status: 500 });
   }
 }
