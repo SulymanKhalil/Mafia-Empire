@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getPusherServer, getRoomChannel } from "@/lib/pusher-server";
+import { getPusherServer } from "@/lib/pusher-server";
 
 export async function POST(req) {
   try {
-    const { text, role, roomCode, displayName: customName, messageId } = await req.json();
+    const { text, role, roomCode, displayName: customName, messageId, isMafiaChat } = await req.json();
     if (!text?.trim() || !role) {
       return NextResponse.json({ error: "text and role required" }, { status: 400 });
     }
@@ -16,15 +16,26 @@ export async function POST(req) {
       doctor: "Doctor"
     };
     const displayName = customName?.trim() || roleNames[role] || "Unknown";
-    const pusher = getPusherServer();
-    const channel = getRoomChannel(roomCode);
+    
+    // Ensure only Mafia can send messages to the private Mafia chat
+    if (isMafiaChat && role !== "mafia") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
 
-    await pusher.trigger(channel, "new-message", {
+    const pusher = getPusherServer();
+    const channelName = isMafiaChat 
+      ? `presence-room-${roomCode.toUpperCase()}-mafia`
+      : `presence-room-${roomCode.toUpperCase()}`;
+
+    const eventName = isMafiaChat ? "new-mafia-message" : "new-message";
+
+    await pusher.trigger(channelName, eventName, {
       id: messageId || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       sender: displayName,
       role,
       text: text.trim(),
       timestamp: Date.now(),
+      isMafiaChat: !!isMafiaChat,
     });
 
     return NextResponse.json({ ok: true });

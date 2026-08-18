@@ -1,7 +1,19 @@
 import { getPusherServer } from "./pusher-server";
 
 // In-memory store of active room codes and their metadata.
-// Value structure: { createdAt: number, hasBeenOccupied: boolean, members: Array }
+// Value structure: { 
+//   createdAt: number, 
+//   hasBeenOccupied: boolean, 
+//   members: Array, 
+//   gameMode: string, 
+//   creatorName: string,
+//   isGameStarted: boolean,
+//   activePlayers: Array, 
+//   actions: Object, 
+//   resolvedResult: string,
+//   history: Array,
+//   mafiaSelections: Object
+// }
 const globalForRooms = global;
 
 if (!globalForRooms.activeRooms) {
@@ -13,7 +25,6 @@ const activeRooms = globalForRooms.activeRooms;
 // Helper to check if Pusher presence channel is occupied
 async function checkChannelOccupied(code) {
   if (!process.env.PUSHER_APP_ID || !process.env.PUSHER_KEY || !process.env.PUSHER_SECRET) {
-    // Return null if Pusher is not configured
     return null;
   }
   const key = code.toUpperCase();
@@ -53,7 +64,7 @@ export async function cleanEmptyRooms() {
       const occupiedChannels = data.channels || {};
       const activeKeys = new Set(
         Object.keys(occupiedChannels).map((chName) => 
-          chName.replace("presence-room-", "").toUpperCase()
+          chName.replace("presence-room-", "").replace("-mafia", "").toUpperCase()
         )
       );
       
@@ -95,14 +106,22 @@ if (!globalForRooms.cleanupInterval) {
   }
 }
 
-export function registerRoom(code) {
+export function registerRoom(code, gameMode = "simple_game", creatorName = "") {
   const key = code.toUpperCase();
-  console.log("[Room Store] Registering room:", key);
+  console.log("[Room Store] Registering room:", key, "mode:", gameMode, "creator:", creatorName);
   if (!activeRooms.has(key)) {
     activeRooms.set(key, {
       createdAt: Date.now(),
       hasBeenOccupied: false,
       members: [],
+      gameMode: gameMode,
+      creatorName: creatorName,
+      isGameStarted: false,
+      activePlayers: [],
+      actions: {},
+      resolvedResult: null,
+      history: [],
+      mafiaSelections: {}
     });
     // Clean up room code from local memory map after 10 minutes if it was never occupied.
     setTimeout(() => {
@@ -115,7 +134,7 @@ export function registerRoom(code) {
   }
 }
 
-export function occupyRoom(code) {
+export function occupyRoom(code, gameMode, creatorName) {
   const key = code.toUpperCase();
   if (activeRooms.has(key)) {
     const room = activeRooms.get(key);
@@ -123,14 +142,39 @@ export function occupyRoom(code) {
       console.log("[Room Store] Room marked as occupied:", key);
       room.hasBeenOccupied = true;
     }
+    if (gameMode && !room.gameMode) {
+      room.gameMode = gameMode;
+    }
+    if (creatorName && !room.creatorName) {
+      room.creatorName = creatorName;
+    }
+  } else {
+    // Recreate room in memory if server restarted but Pusher channel is occupied
+    activeRooms.set(key, {
+      createdAt: Date.now(),
+      hasBeenOccupied: true,
+      members: [],
+      gameMode: gameMode || "advanced_game",
+      creatorName: creatorName || "",
+      isGameStarted: false,
+      activePlayers: [],
+      actions: {},
+      resolvedResult: null,
+      history: [],
+      mafiaSelections: {}
+    });
   }
+}
+
+export function getRoom(code) {
+  const key = code.toUpperCase();
+  return activeRooms.get(key) || null;
 }
 
 export async function isValidRoom(code) {
   const key = code.toUpperCase();
   
   if (!activeRooms.has(key)) {
-    // If not in cache, check if it's currently occupied on Pusher
     const occupiedStatus = await checkChannelOccupied(key);
     if (occupiedStatus === true) {
       console.log("[Room Store] Validating room:", key, "-> true (from Pusher occupancy, re-caching)");
@@ -138,8 +182,16 @@ export async function isValidRoom(code) {
         createdAt: Date.now(),
         hasBeenOccupied: true,
         members: [],
+        gameMode: "advanced_game",
+        creatorName: "",
+        isGameStarted: false,
+        activePlayers: [],
+        actions: {},
+        resolvedResult: null,
+        history: [],
+        mafiaSelections: {}
       });
-      return { valid: true };
+      return { valid: true, gameMode: "advanced_game", creatorName: "" };
     }
     console.log("[Room Store] Validating room:", key, "-> false (not found)");
     return { valid: false, error: "Room not found." };
@@ -150,31 +202,27 @@ export async function isValidRoom(code) {
 
   if (occupiedStatus === true) {
     room.hasBeenOccupied = true;
-    console.log("[Room Store] Validating room:", key, "-> true (occupied channel on Pusher)");
-    return { valid: true };
+    console.log("[Room Store] Validating room:", key, "-> true (occupied channel on Pusher), mode:", room.gameMode);
+    return { valid: true, gameMode: room.gameMode, creatorName: room.creatorName };
   } else if (occupiedStatus === false) {
-    // Unoccupied
     if (room.hasBeenOccupied) {
       console.log("[Room Store] Validating room:", key, "-> false (was occupied but is now empty. Destroying)");
       activeRooms.delete(key);
-      return { valid: false, error: "Room not found." };
+      return { valid: false, error: "Room has expired." };
     }
     
-    // Check if grace period is still active
     const age = Date.now() - room.createdAt;
     if (age > 600000) {
       console.log("[Room Store] Validating room:", key, "-> false (grace period expired. Destroying)");
       activeRooms.delete(key);
-      return { valid: false, error: "Room not found." };
+      return { valid: false, error: "Room has expired." };
     }
     
-    console.log("[Room Store] Validating room:", key, "-> true (in grace period)");
-    return { valid: true };
+    console.log("[Room Store] Validating room:", key, "-> true (in grace period), mode:", room.gameMode);
+    return { valid: true, gameMode: room.gameMode, creatorName: room.creatorName };
   } else {
-    // occupiedStatus is null (e.g. Pusher API call failed)
-    // Keep it valid to avoid false positives/negatives during Pusher API outages
-    console.log("[Room Store] Validating room:", key, "-> true (Pusher check failed, falling back to cache)");
-    return { valid: true };
+    console.log("[Room Store] Validating room:", key, "-> true (Pusher check failed, falling back to cache), mode:", room.gameMode);
+    return { valid: true, gameMode: room.gameMode, creatorName: room.creatorName };
   }
 }
 
@@ -186,13 +234,23 @@ export function addMember(code, member) {
       createdAt: Date.now(),
       hasBeenOccupied: true,
       members: [],
+      gameMode: "advanced_game",
+      creatorName: "",
+      isGameStarted: false,
+      activePlayers: [],
+      actions: {},
+      resolvedResult: null,
+      history: [],
+      mafiaSelections: {}
     });
   }
   const room = activeRooms.get(key);
   if (!room.members) {
     room.members = [];
   }
-  room.members.push(member);
+  if (!room.members.some(m => m.displayName === member.displayName)) {
+    room.members.push(member);
+  }
   room.hasBeenOccupied = true;
 }
 
@@ -205,12 +263,10 @@ export function removeMember(code, role, displayName) {
       room.members = [];
     }
     const members = room.members;
-    // Try to remove by displayName first (more specific when multiple roles exist)
     let idx = -1;
     if (displayName) {
       idx = members.findIndex((m) => m.displayName === displayName);
     }
-    // Fallback to role if displayName doesn't match
     if (idx === -1) {
       idx = members.findIndex((m) => m.role === role);
     }
