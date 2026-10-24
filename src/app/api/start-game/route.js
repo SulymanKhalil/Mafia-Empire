@@ -26,11 +26,14 @@ export async function POST(req) {
     const detectiveCount = members.filter(m => m.role === 'detective').length;
     const doctorCount = members.filter(m => m.role === 'doctor').length;
 
-    if (mafiaCount < 2 || mafiaCount > 3) {
-      return NextResponse.json({ error: `Mafia requirements not satisfied: Must be 2 or 3 players (Currently: ${mafiaCount}).` });
+    if (mafiaCount < 1) {
+      return NextResponse.json({ error: "At least 1 Mafia player is required to start the game." });
+    }
+    if (mafiaCount > 3) {
+      return NextResponse.json({ error: `Maximum 3 Mafia players allowed (Currently: ${mafiaCount}).` });
     }
     if (civilianCount < 4) {
-      return NextResponse.json({ error: `Civilian requirements not satisfied: Must be at least 4 players (Currently: ${civilianCount}).` });
+      return NextResponse.json({ error: `At least 4 Civilian players are required to start the game (Currently: ${civilianCount}).` });
     }
     if (detectiveCount > 1) {
       return NextResponse.json({ error: `Detective limit exceeded: Max 1 player (Currently: ${detectiveCount}).` });

@@ -151,20 +151,20 @@ function ParticleField({ count = 18 }) {
 }
 
 // ── API Helpers ──────────────────────────────────────────────────────────────
-async function apiRegisterRoom(roomCode, gameMode, creatorName) {
+async function apiRegisterRoom(roomCode, creatorName) {
   await fetch("/api/register-room", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomCode, gameMode, creatorName }),
+    body: JSON.stringify({ roomCode, creatorName }),
   });
 }
 
-async function apiValidateRoom(roomCode) {
+async function apiValidateRoom(roomCode, role) {
   try {
     const res = await fetch("/api/validate-room", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomCode }),
+      body: JSON.stringify({ roomCode, role }),
     });
     if (!res.ok) {
       return { valid: false, error: "Server error. Please try again." };
@@ -193,10 +193,10 @@ async function apiTyping(role, roomCode, displayName, isTyping) {
 }
 
 const ROLES = [
-  { id: "mafia", name: "Mafia", icon: "fa-skull", color: "#fc8181", bg: "rgba(229,62,62,0.12)", border: "rgba(229,62,62,0.45)", hoverBg: "rgba(229,62,62,0.05)", hoverBorder: "rgba(229,62,62,0.25)", desc: "Hidden in the shadows" },
-  { id: "civilian", name: "Civilian", icon: "fa-person", color: "#38bdf8", bg: "rgba(14,165,233,0.12)", border: "rgba(14,165,233,0.45)", hoverBg: "rgba(14,165,233,0.05)", hoverBorder: "rgba(14,165,233,0.25)", desc: "Voice of the town" },
-  { id: "detective", name: "Detective", icon: "fa-user-secret", color: "#c084fc", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.45)", hoverBg: "rgba(168,85,247,0.05)", hoverBorder: "rgba(168,85,247,0.25)", desc: "Seeking the truth" },
-  { id: "doctor", name: "Doctor", icon: "fa-user-doctor", color: "#2dd4bf", bg: "rgba(45,212,191,0.12)", border: "rgba(45,212,191,0.45)", hoverBg: "rgba(45,212,191,0.05)", hoverBorder: "rgba(45,212,191,0.25)", desc: "Saving lives" }
+  { id: "mafia", name: "Mafia", icon: "fa-skull", color: "#ef4444", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.45)", glow: "rgba(239,68,68,0.25)", hoverBg: "rgba(239,68,68,0.05)", hoverBorder: "rgba(239,68,68,0.25)", desc: "Hidden in the shadows" },
+  { id: "civilian", name: "Civilian", icon: "fa-person", color: "#eab308", bg: "rgba(234,179,8,0.12)", border: "rgba(234,179,8,0.45)", glow: "rgba(234,179,8,0.25)", hoverBg: "rgba(234,179,8,0.05)", hoverBorder: "rgba(234,179,8,0.25)", desc: "Voice of the town" },
+  { id: "doctor", name: "Doctor", icon: "fa-user-doctor", color: "#22c55e", bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.45)", glow: "rgba(34,197,94,0.25)", hoverBg: "rgba(34,197,94,0.05)", hoverBorder: "rgba(34,197,94,0.25)", desc: "Saving lives" },
+  { id: "detective", name: "Detective", icon: "fa-user-secret", color: "#a855f7", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.45)", glow: "rgba(168,85,247,0.25)", hoverBg: "rgba(168,85,247,0.05)", hoverBorder: "rgba(168,85,247,0.25)", desc: "Seeking the truth" }
 ];
 
 // ── Shared background decorations ────────────────────────────────────────────
@@ -228,9 +228,8 @@ function BgDecorations() {
 
 // ── Lobby ────────────────────────────────────────────────────────────────────
 function Lobby({ onEnter }) {
-  const [step, setStep] = useState("initial"); // initial, create_setup, create_name, create, join_code, join_setup, join_name
-  const [gameMode, setGameMode] = useState("simple_game"); // simple_game | advanced_game
-  const [role, setRole] = useState(null);
+  const [step, setStep] = useState("initial"); // initial, create_name, create, join_code, join_name
+  const [role, setRole] = useState("mafia");
   const [displayName, setDisplayName] = useState("");
   const [nameError, setNameError] = useState("");
   const [createdCode, setCreatedCode] = useState(null);
@@ -242,12 +241,6 @@ function Lobby({ onEnter }) {
   const trimmedName = displayName.trim();
   const canProceed = trimmedName.length >= 2;
 
-  const handleCreateClick = (selectedMode) => {
-    setGameMode(selectedMode);
-    setRole(null);
-    setStep("create_setup");
-  };
-
   const handleCreateRoom = async () => {
     if (!canProceed) {
       setNameError("Real name must be at least 2 characters.");
@@ -256,7 +249,7 @@ function Lobby({ onEnter }) {
     const code = generateRoomCode();
     setCreatedCode(code);
     setStep("create");
-    await apiRegisterRoom(code, gameMode, trimmedName);
+    await apiRegisterRoom(code, trimmedName);
   };
 
   const handleJoinValidation = async () => {
@@ -266,15 +259,13 @@ function Lobby({ onEnter }) {
       return;
     }
     setValidating(true);
-    const result = await apiValidateRoom(code);
+    const result = await apiValidateRoom(code, role);
     setValidating(false);
     if (!result.valid) {
       setJoinError(result.error || "Please enter a valid code");
       return;
     }
-    setGameMode(result.gameMode || "simple_game");
-    setRole(null);
-    setStep("join_setup");
+    setStep("join_name");
   };
 
   const handleCopy = () => {
@@ -285,10 +276,7 @@ function Lobby({ onEnter }) {
     }
   };
 
-  // Only Mafia and Civilian are allowed in Simple Game
-  const activeRoles = gameMode === "simple_game"
-    ? ROLES.filter(r => r.id === "mafia" || r.id === "civilian")
-    : ROLES;
+  const activeRoles = ROLES;
 
   return (
     <div
@@ -306,10 +294,10 @@ function Lobby({ onEnter }) {
       <BgDecorations />
       <ParticleField count={22} />
 
-      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: "22.5rem" }}>
+      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: "25rem" }}>
         {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+        <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 8px #e53e3e" }} />
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>
               Mafia Empire
@@ -324,10 +312,10 @@ function Lobby({ onEnter }) {
               fontSize: "2.5rem",
               lineHeight: 1.1,
               color: "#ffffff",
-              marginBottom: "0.5rem",
+              marginBottom: "0.25rem",
             }}
           >
-            Select Game Mode
+            Mafia Empire
           </h1>
         </div>
 
@@ -342,158 +330,158 @@ function Lobby({ onEnter }) {
             padding: "1.5rem",
           }}
         >
-          {/* ── Step: Initial (Game Selection Home UI) ── */}
+          {/* ── Step: Initial (Role Selection Home UI) ── */}
           {step === "initial" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              
-              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.65rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", margin: "0 0 0.25rem 0" }}>
-                Select Game Mode
-              </p>
-
-              {/* Game Mode Cards Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "0.75rem" }}>
-                {/* Card 1: Classic Showdown */}
-                <div
-                  onClick={() => setGameMode("simple_game")}
+              {/* Roles Selection */}
+              <div>
+                <p
                   style={{
-                    background: gameMode === "simple_game" ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.02)",
-                    border: gameMode === "simple_game" ? "1px solid #fc8181" : "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: "1rem",
-                    padding: "1.25rem 0.5rem",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "0.65rem",
-                    textAlign: "center",
-                    boxShadow: gameMode === "simple_game" ? "0 0 10px rgba(252,129,129,0.12)" : "none"
+                    fontFamily: "'Syne', sans-serif",
+                    fontSize: "0.68rem",
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.35)",
+                    margin: "0 0 0.75rem 0",
+                    fontWeight: 600,
                   }}
                 >
-                  <i 
-                    className="fa-solid fa-street-view" 
-                    style={{ 
-                      fontSize: "1.75rem", 
-                      color: gameMode === "simple_game" ? "#fc8181" : "rgba(255,255,255,0.4)" 
-                    }} 
-                  />
-                  <div>
-                    <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.92rem", color: gameMode === "simple_game" ? "#fc8181" : "#fff", margin: "0 0 0.25rem 0" }}>
-                      Classic Showdown
-                    </h3>
-                    <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.68rem", color: "rgba(255,255,255,0.35)", margin: 0, lineHeight: 1.3 }}>
-                      Mafia vs Civilian
-                    </p>
-                  </div>
-                </div>
+                  Select Role
+                </p>
 
-                {/* Card 2: Mafia: Ultimate */}
+                {/* Role Cards Grid */}
                 <div
-                  onClick={() => setGameMode("advanced_game")}
                   style={{
-                    background: gameMode === "advanced_game" ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.02)",
-                    border: gameMode === "advanced_game" ? "1px solid #fc8181" : "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: "1rem",
-                    padding: "1.25rem 0.5rem",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "0.65rem",
-                    textAlign: "center",
-                    boxShadow: gameMode === "advanced_game" ? "0 0 10px rgba(252,129,129,0.12)" : "none"
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "0.85rem",
+                    marginBottom: "0.5rem",
                   }}
                 >
-                  <i 
-                    className="fa-solid fa-skull-crossbones" 
-                    style={{ 
-                      fontSize: "1.75rem", 
-                      color: gameMode === "advanced_game" ? "#fc8181" : "rgba(255,255,255,0.4)" 
-                    }} 
-                  />
-                  <div>
-                    <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.92rem", color: gameMode === "advanced_game" ? "#fc8181" : "#fff", margin: "0 0 0.25rem 0" }}>
-                      Mafia: Ultimate
-                    </h3>
-                    <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.68rem", color: "rgba(255,255,255,0.35)", margin: 0, lineHeight: 1.3 }}>
-                      Full role experience
-                    </p>
-                  </div>
+                  {activeRoles.map((r) => {
+                    const isSelected = role === r.id;
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => setRole(r.id)}
+                        style={{
+                          background: isSelected ? r.bg : "rgba(255,255,255,0.025)",
+                          border: isSelected ? `1.5px solid ${r.color}` : "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: "1.1rem",
+                          padding: "1.25rem 0.5rem",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.65rem",
+                          textAlign: "center",
+                          boxShadow: isSelected ? `0 0 16px ${r.glow}` : "none",
+                        }}
+                      >
+                        <i 
+                          className={`fa-solid ${r.icon}`} 
+                          style={{ 
+                            fontSize: "1.85rem", 
+                            color: isSelected ? r.color : "rgba(255,255,255,0.4)" 
+                          }} 
+                        />
+                        <div>
+                          <h3
+                            style={{
+                              fontFamily: "'Syne', sans-serif",
+                              fontWeight: 700,
+                              fontSize: "0.95rem",
+                              color: isSelected ? r.color : "#ffffff",
+                              margin: "0 0 0.25rem 0",
+                            }}
+                          >
+                            {r.name}
+                          </h3>
+                          <p
+                            style={{
+                              fontFamily: "'DM Sans', sans-serif",
+                              fontSize: "0.7rem",
+                              color: "rgba(255,255,255,0.38)",
+                              margin: 0,
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {r.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Action Buttons styled like the reference pill designs */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {gameMode === "simple_game" ? (
-                  <button
-                    onClick={() => handleCreateClick("simple_game")}
-                    style={{
-                      width: "100%",
-                      padding: "0.95rem",
-                      borderRadius: "1.25rem",
-                      fontFamily: "'Syne', sans-serif",
-                      fontWeight: 700,
-                      fontSize: "0.82rem",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      background: "#ffffff",
-                      color: "#000000",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <i className="fa-solid fa-plus" />
-                    Create Classic Room
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleCreateClick("advanced_game")}
-                    style={{
-                      width: "100%",
-                      padding: "0.95rem",
-                      borderRadius: "1.25rem",
-                      fontFamily: "'Syne', sans-serif",
-                      fontWeight: 700,
-                      fontSize: "0.82rem",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      background: "#ffffff",
-                      color: "#000000",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <i className="fa-solid fa-plus" />
-                    Create Ultimate Room
-                  </button>
-                )}
-
                 <button
-                  onClick={() => setStep("join_code")}
+                  type="button"
+                  onClick={() => setStep("create_name")}
+                  disabled={!role}
                   style={{
                     width: "100%",
-                    padding: "0.95rem",
-                    borderRadius: "1.25rem",
+                    padding: "1rem",
+                    borderRadius: "9999px",
+                    fontFamily: "'Syne', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "0.82rem",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    background: role ? "#ffffff" : "rgba(255,255,255,0.05)",
+                    color: role ? "#000000" : "rgba(255,255,255,0.25)",
+                    border: "none",
+                    cursor: role ? "pointer" : "not-allowed",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.5rem",
+                    boxShadow: role ? "0 4px 18px rgba(255,255,255,0.12)" : "none",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <i className="fa-solid fa-plus" style={{ fontSize: "0.75rem" }} />
+                  CREATE ROOM
+                </button>
+
+                <div style={{ display: "flex", alignItems: "center", margin: "0.15rem 0" }}>
+                  <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
+                  <span
+                    style={{
+                      padding: "0 0.85rem",
+                      fontSize: "0.68rem",
+                      color: "rgba(255,255,255,0.3)",
+                      textTransform: "uppercase",
+                      fontFamily: "'Syne', sans-serif",
+                      letterSpacing: "0.1em",
+                      fontWeight: 600,
+                    }}
+                  >
+                    OR
+                  </span>
+                  <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStep("join_code")}
+                  disabled={!role}
+                  style={{
+                    width: "100%",
+                    padding: "1rem",
+                    borderRadius: "9999px",
                     fontFamily: "'Syne', sans-serif",
                     fontWeight: 700,
                     fontSize: "0.82rem",
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
                     background: "transparent",
-                    color: "#ffffff",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    cursor: "pointer",
+                    color: role ? "#ffffff" : "rgba(255,255,255,0.25)",
+                    border: role ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(255,255,255,0.07)",
+                    cursor: role ? "pointer" : "not-allowed",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -501,107 +489,23 @@ function Lobby({ onEnter }) {
                     transition: "all 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                    if (role) {
+                      e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
+                    if (role) {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                    }
                   }}
                 >
-                  <i className="fa-solid fa-right-to-bracket" style={{ fontSize: "0.8rem" }} />
-                  Join Room
+                  <i className="fa-solid fa-right-to-bracket" style={{ fontSize: "0.78rem" }} />
+                  JOIN ROOM
                 </button>
               </div>
             </div>
-          )}
-
-          {/* ── Step: Create Setup (Select Role) ── */}
-          {step === "create_setup" && (
-            <>
-              {/* Back */}
-              <button
-                onClick={() => { setStep("initial"); setRole(null); }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "0.72rem",
-                  color: "rgba(255,255,255,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  padding: 0,
-                  marginBottom: "1.25rem",
-                }}
-              >
-                <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
-                Back to Modes Selection
-              </button>
-
-              <div style={{ marginBottom: "1rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.4)" }}>
-                Selected Mode: <strong style={{ color: gameMode === "advanced_game" ? "#fc8181" : "#fff" }}>
-                  {gameMode === "advanced_game" ? "Advanced Game" : "Simple Game"}
-                </strong>
-              </div>
-
-              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "0.75rem" }}>
-                Select Your Initial Role
-              </p>
-
-              {/* Role Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
-                {activeRoles.map((r) => {
-                  const isSelected = role === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => setRole(r.id)}
-                      style={{
-                        background: isSelected ? r.bg : "rgba(255,255,255,0.03)",
-                        border: isSelected ? `1px solid ${r.border}` : "1px solid rgba(255,255,255,0.06)",
-                        borderRadius: "0.875rem",
-                        padding: "1rem 0.75rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <i className={`fa-solid ${r.icon}`} style={{ fontSize: "1.4rem", color: isSelected ? r.color : "rgba(255,255,255,0.4)" }} />
-                      <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.8rem", color: isSelected ? r.color : "rgba(255,255,255,0.7)" }}>
-                        {r.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setStep("create_name")}
-                disabled={!role}
-                style={{
-                  width: "100%",
-                  padding: "0.875rem",
-                  borderRadius: "0.875rem",
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "0.8rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  background: role ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
-                  color: role ? "#000" : "rgba(255,255,255,0.2)",
-                  border: role ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
-                  cursor: role ? "pointer" : "not-allowed",
-                  transition: "all 0.2s",
-                }}
-              >
-                Continue
-              </button>
-            </>
           )}
 
           {/* ── Step: Create Name (Real Name Input Only) ── */}
@@ -609,7 +513,7 @@ function Lobby({ onEnter }) {
             <>
               {/* Back */}
               <button
-                onClick={() => { setStep("create_setup"); setNameError(""); }}
+                onClick={() => { setStep("initial"); setNameError(""); }}
                 style={{
                   background: "none",
                   border: "none",
@@ -735,7 +639,7 @@ function Lobby({ onEnter }) {
               </p>
 
               <button
-                onClick={() => onEnter(role, createdCode, trimmedName, gameMode, trimmedName)}
+                onClick={() => onEnter(role, createdCode, trimmedName, trimmedName)}
                 style={{
                   width: "100%",
                   padding: "0.875rem",
@@ -781,7 +685,7 @@ function Lobby({ onEnter }) {
                 }}
               >
                 <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
-                Back to Modes Selection
+                Back
               </button>
 
               <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
@@ -843,100 +747,12 @@ function Lobby({ onEnter }) {
             </>
           )}
 
-          {/* ── Step: Join Setup (Select Role) ── */}
-          {step === "join_setup" && (
-            <>
-              {/* Back */}
-              <button
-                onClick={() => { setStep("join_code"); setRole(null); }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "0.72rem",
-                  color: "rgba(255,255,255,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  padding: 0,
-                  marginBottom: "1.25rem",
-                }}
-              >
-                <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
-                Back
-              </button>
-
-              <div style={{ marginBottom: "1rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.4)" }}>
-                Detected Mode: <strong style={{ color: gameMode === "advanced_game" ? "#fc8181" : "#fff" }}>
-                  {gameMode === "advanced_game" ? "Advanced Game" : "Simple Game"}
-                </strong>
-              </div>
-
-              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "0.75rem" }}>
-                Select Your Role
-              </p>
-
-              {/* Role Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
-                {activeRoles.map((r) => {
-                  const isSelected = role === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => setRole(r.id)}
-                      style={{
-                        background: isSelected ? r.bg : "rgba(255,255,255,0.03)",
-                        border: isSelected ? `1px solid ${r.border}` : "1px solid rgba(255,255,255,0.06)",
-                        borderRadius: "0.875rem",
-                        padding: "1rem 0.75rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <i className={`fa-solid ${r.icon}`} style={{ fontSize: "1.4rem", color: isSelected ? r.color : "rgba(255,255,255,0.4)" }} />
-                      <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.8rem", color: isSelected ? r.color : "rgba(255,255,255,0.7)" }}>
-                        {r.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setStep("join_name")}
-                disabled={!role}
-                style={{
-                  width: "100%",
-                  padding: "0.875rem",
-                  borderRadius: "0.875rem",
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "0.8rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  background: role ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
-                  color: role ? "#000" : "rgba(255,255,255,0.2)",
-                  border: role ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
-                  cursor: role ? "pointer" : "not-allowed",
-                  transition: "all 0.2s",
-                }}
-              >
-                Continue
-              </button>
-            </>
-          )}
-
           {/* ── Step: Join Name ── */}
           {step === "join_name" && (
             <>
               {/* Back */}
               <button
-                onClick={() => { setStep("join_setup"); setNameError(""); }}
+                onClick={() => { setStep("join_code"); setNameError(""); }}
                 style={{
                   background: "none",
                   border: "none",
@@ -963,7 +779,7 @@ function Lobby({ onEnter }) {
                 type="text"
                 value={displayName}
                 onChange={(e) => { setDisplayName(e.target.value); setNameError(""); }}
-                onKeyDown={(e) => { if (e.key === "Enter" && canProceed) onEnter(role, joinInput, trimmedName, gameMode, ""); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && canProceed) onEnter(role, joinInput, trimmedName, ""); }}
                 placeholder="e.g. Ahmed, Sara, Usman"
                 maxLength={20}
                 style={{
@@ -989,7 +805,7 @@ function Lobby({ onEnter }) {
               )}
 
               <button
-                onClick={() => onEnter(role, joinInput, trimmedName, gameMode, "")}
+                onClick={() => onEnter(role, joinInput, trimmedName, "")}
                 disabled={!canProceed}
                 style={{
                   width: "100%",
@@ -1018,7 +834,7 @@ function Lobby({ onEnter }) {
 }
 
 // ── ChatRoom ─────────────────────────────────────────────────────────────────
-function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, onExit }) {
+function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
   const [messages, setMessages] = useState([]);
   const [mafiaMessages, setMafiaMessages] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1035,9 +851,8 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
   const mafiaChannelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // Layout screen selector for Advanced Game
-  // Default is "action" as per request
-  const [activeScreen, setActiveScreen] = useState(gameMode === "advanced_game" ? "action" : "chat");
+  // Layout screen selector (Action is the default screen)
+  const [activeScreen, setActiveScreen] = useState("action");
   const [chatTab, setChatTab] = useState("public"); // public | mafia
 
   // Game Creator Permission
@@ -1069,7 +884,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
   const detectiveCount = members.filter(m => m.role === 'detective').length;
   const doctorCount = members.filter(m => m.role === 'doctor').length;
 
-  const isConfigValid = mafiaCount >= 2 && mafiaCount <= 3 && civilianCount >= 4 && detectiveCount <= 1 && doctorCount <= 1;
+  const isConfigValid = mafiaCount >= 1 && mafiaCount <= 3 && civilianCount >= 4 && detectiveCount <= 1 && doctorCount <= 1;
 
   // Sync state on load
   useEffect(() => {
@@ -1124,7 +939,6 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
           params: {
             displayName,
             role,
-            gameMode,
             creatorName,
           },
         },
@@ -1227,7 +1041,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
 
       // Subscribe to Mafia Chat & Selections
       let mafiaChannel = null;
-      if (gameMode === "advanced_game" && role === "mafia") {
+      if (role === "mafia") {
         mafiaChannel = pusherRef.current.subscribe(`${pusherChannel}-mafia`);
         mafiaChannelRef.current = mafiaChannel;
 
@@ -1254,7 +1068,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
       console.error("Failed to initialize Pusher:", err);
       setPusherError(true);
     }
-  }, [displayName, role, gameMode, roomCode, creatorName]);
+  }, [displayName, role, roomCode, creatorName]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1300,7 +1114,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
     setSending(true);
     setInput("");
     flushTyping();
-    const isMafiaChat = chatTab === "mafia" && gameMode === "advanced_game";
+    const isMafiaChat = chatTab === "mafia";
     await apiMessage(text, role, roomCode, displayName, isMafiaChat);
     setSending(false);
     inputRef.current?.focus();
@@ -1352,7 +1166,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
   // Live Mafia selection broadcast
   const handleMafiaCardClick = async (targetName) => {
     setSelectedTarget(targetName);
-    if (role === "mafia" && gameMode === "advanced_game") {
+    if (role === "mafia") {
       try {
         await fetch("/api/mafia-select", {
           method: "POST",
@@ -1425,7 +1239,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
     border: "rgba(255,255,255,0.2)"
   };
 
-  const activeMessages = (chatTab === "mafia" && gameMode === "advanced_game") ? mafiaMessages : messages;
+  const activeMessages = (chatTab === "mafia") ? mafiaMessages : messages;
 
   return (
     <div
@@ -1539,8 +1353,8 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
         </div>
       </div>
 
-      {/* ── Advanced Mode Selector Navigation Tabs ── */}
-      {gameMode === "advanced_game" && (
+      {/* ── Navigation Tabs ── */}
+      {(
         <div style={{ display: "flex", background: "rgba(15,15,15,0.9)", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, zIndex: 10, overflowX: "auto" }}>
           <button 
             onClick={() => setActiveScreen("action")}
@@ -1630,7 +1444,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
       {/* ── Main Layout View switcher ── */}
       <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
         
-        {/* SCREEN 1: CHAT INTERFACE (Simple Game Chat / Custom Tab in Advanced Game) */}
+        {/* SCREEN 1: CHAT INTERFACE */}
         {activeScreen === "chat" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             
@@ -1662,9 +1476,6 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
                 >
                   <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.72)" }}>
                     Playing as <strong style={{ color: "#fff" }}>{displayName}</strong>
-                    {gameMode === "simple_game" && (
-                      <span> · <strong style={{ color: currentRoleObj.color }}>{currentRoleObj.name}</strong></span>
-                    )}
                   </span>
                 </div>
                 <div
@@ -1688,11 +1499,6 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
               {/* Members listing */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
                 {members.map((member, idx) => {
-                  const isAdvanced = gameMode === "advanced_game";
-                  const memberRole = isAdvanced 
-                    ? { color: "#ffffff", bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.08)" } 
-                    : (ROLES.find((r) => r.id === member.role) || { color: "#fff", bg: "rgba(255,255,255,0.06)", border: "rgba(255,255,255,0.1)" });
-                  
                   return (
                     <span
                       key={`${member.displayName}-${idx}`}
@@ -1702,14 +1508,14 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
                         gap: "0.35rem",
                         padding: "0.45rem 0.75rem",
                         borderRadius: "999px",
-                        background: memberRole.bg,
-                        color: memberRole.color,
-                        border: `1px solid ${memberRole.border}`,
+                        background: "rgba(255,255,255,0.04)",
+                        color: "#ffffff",
+                        border: "1px solid rgba(255,255,255,0.08)",
                         fontFamily: "'DM Sans', sans-serif",
                         fontSize: "0.72rem",
                       }}
                     >
-                      <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "999px", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.08)", color: memberRole.color, fontWeight: 700 }}>
+                      <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "999px", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.08)", color: "#ffffff", fontWeight: 700 }}>
                         {getInitials(member.displayName)}
                       </span>
                       {member.displayName}
@@ -1747,10 +1553,7 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
                   );
                 }
 
-                const isAdvanced = gameMode === "advanced_game";
-                const msgRoleObj = isAdvanced 
-                  ? { name: "Player", color: "#e5e5e5", border: "rgba(255,255,255,0.1)", bg: "rgba(255,255,255,0.03)" }
-                  : (ROLES.find((r) => r.id === msg.role) || { name: "Unknown", color: "#60a5fa", border: "rgba(59,130,246,0.12)", bg: "rgba(59,130,246,0.05)" });
+                const msgRoleObj = { name: "Player", color: "#e5e5e5", border: "rgba(255,255,255,0.1)", bg: "rgba(255,255,255,0.03)" };
 
                 const initials = getInitials(msg.sender);
 
@@ -1777,21 +1580,6 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
                       }}
                     >
                       {initials}
-                      {!isAdvanced && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            bottom: "-2px",
-                            right: "-2px",
-                            width: "0.55rem",
-                            height: "0.55rem",
-                            borderRadius: "50%",
-                            background: msgRoleObj.color,
-                            border: "1px solid #000000",
-                          }}
-                          title={msgRoleObj.name}
-                        />
-                      )}
                     </div>
 
                     {/* Chat Text bubbles */}
@@ -1800,11 +1588,6 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
                         <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", letterSpacing: "0.05em", color: msgRoleObj.color }}>
                           {msg.sender}
                         </span>
-                        {!isAdvanced && (
-                          <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.65rem", letterSpacing: "0.02em", color: "rgba(255,255,255,0.3)" }}>
-                            - {msgRoleObj.name}
-                          </span>
-                        )}
                       </div>
                       <div style={{ display: "flex", gap: "0.35rem", alignItems: "flex-start" }}>
                         <div
@@ -1920,8 +1703,8 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
           </div>
         )}
 
-        {/* SCREEN 2: ACTION SCREEN (Default for Advanced Game) */}
-        {activeScreen === "action" && gameMode === "advanced_game" && (
+        {/* SCREEN 2: ACTION SCREEN */}
+        {activeScreen === "action" && (
           <div
             style={{
               flex: 1,
@@ -1959,18 +1742,46 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
                 {/* Requirements check list */}
                 <div style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.75rem", padding: "1rem" }}>
                   <h4 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: "#fff", margin: "0 0 0.6rem 0", textTransform: "uppercase" }}>
-                    Advanced Game Requirements:
+                    Role Requirements:
                   </h4>
                   <ul style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.5)", margin: 0, paddingLeft: "1.2rem", lineHeight: 1.6 }}>
-                    <li style={{ color: mafiaCount >= 2 && mafiaCount <= 3 ? "#4ade80" : "#fc8181" }}>
-                      Mafia: 2 or 3 players (Currently: {mafiaCount})
+                    <li style={{ color: mafiaCount >= 1 && mafiaCount <= 3 ? "#4ade80" : "#fc8181" }}>
+                      Mafia: Minimum 1, maximum 3 (Currently: {mafiaCount})
                     </li>
                     <li style={{ color: civilianCount >= 4 ? "#4ade80" : "#fc8181" }}>
-                      Civilian: At least 4 players (Currently: {civilianCount})
+                      Civilian: Minimum 4 (Currently: {civilianCount})
                     </li>
-                    {detectiveCount > 1 && <li style={{ color: "#fc8181" }}>Detective: Max 1 player (Currently: {detectiveCount})</li>}
-                    {doctorCount > 1 && <li style={{ color: "#fc8181" }}>Doctor: Max 1 player (Currently: {doctorCount})</li>}
+                    <li style={{ color: detectiveCount <= 1 ? "#4ade80" : "#fc8181" }}>
+                      Detective: Optional{detectiveCount > 0 ? ` (${detectiveCount} selected)` : ""}
+                    </li>
+                    <li style={{ color: doctorCount <= 1 ? "#4ade80" : "#fc8181" }}>
+                      Doctor: Optional{doctorCount > 0 ? ` (${doctorCount} selected)` : ""}
+                    </li>
                   </ul>
+
+                  {!isConfigValid && (
+                    <div
+                      style={{
+                        marginTop: "0.85rem",
+                        padding: "0.65rem 0.85rem",
+                        borderRadius: "0.5rem",
+                        background: "rgba(239,68,68,0.08)",
+                        border: "1px solid rgba(239,68,68,0.25)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.35rem", color: "#fc8181", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>
+                        <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: "0.7rem" }} />
+                        Requirements Not Met:
+                      </div>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.73rem", color: "#fc8181", display: "flex", flexDirection: "column", gap: "0.2rem", lineHeight: 1.4 }}>
+                        {mafiaCount < 1 && <div>• At least 1 Mafia player is required.</div>}
+                        {mafiaCount > 3 && <div>• Maximum 3 Mafia players allowed (currently {mafiaCount}).</div>}
+                        {civilianCount < 4 && <div>• At least 4 Civilian players are required (currently {civilianCount}/4).</div>}
+                        {detectiveCount > 1 && <div>• Maximum 1 Detective allowed (currently {detectiveCount}).</div>}
+                        {doctorCount > 1 && <div>• Maximum 1 Doctor allowed (currently {doctorCount}).</div>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {isCreator ? (
@@ -2284,8 +2095,8 @@ function ChatRoom({ role, roomCode, displayName, gameMode, initialCreatorName, o
           </div>
         )}
 
-        {/* SCREEN 3: HISTORY SCREEN (Advanced Game Only) */}
-        {activeScreen === "history" && gameMode === "advanced_game" && (
+        {/* SCREEN 3: HISTORY SCREEN */}
+        {activeScreen === "history" && (
           <div
             style={{
               flex: 1,
@@ -2373,14 +2184,12 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [roomCode, setRoomCode] = useState(null);
   const [displayName, setDisplayName] = useState("");
-  const [gameMode, setGameMode] = useState("simple_game");
   const [creatorName, setCreatorName] = useState("");
 
-  const handleEnter = (selectedRole, code, name, selectedMode, creator) => {
+  const handleEnter = (selectedRole, code, name, creator) => {
     setRole(selectedRole);
     setRoomCode(code);
     setDisplayName(name);
-    setGameMode(selectedMode || "simple_game");
     if (creator) {
       setCreatorName(creator);
     }
@@ -2396,5 +2205,5 @@ export default function App() {
   };
 
   if (screen === "lobby") return <Lobby onEnter={handleEnter} />;
-  return <ChatRoom role={role} roomCode={roomCode} displayName={displayName} gameMode={gameMode} initialCreatorName={creatorName} onExit={handleExit} />;
+  return <ChatRoom role={role} roomCode={roomCode} displayName={displayName} initialCreatorName={creatorName} onExit={handleExit} />;
 }

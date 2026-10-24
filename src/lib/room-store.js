@@ -106,15 +106,15 @@ if (!globalForRooms.cleanupInterval) {
   }
 }
 
-export function registerRoom(code, gameMode = "simple_game", creatorName = "") {
+export function registerRoom(code, gameMode = "standard", creatorName = "") {
   const key = code.toUpperCase();
-  console.log("[Room Store] Registering room:", key, "mode:", gameMode, "creator:", creatorName);
+  console.log("[Room Store] Registering room:", key, "creator:", creatorName);
   if (!activeRooms.has(key)) {
     activeRooms.set(key, {
       createdAt: Date.now(),
       hasBeenOccupied: false,
       members: [],
-      gameMode: gameMode,
+      gameMode: "standard",
       creatorName: creatorName,
       isGameStarted: false,
       activePlayers: [],
@@ -142,9 +142,6 @@ export function occupyRoom(code, gameMode, creatorName) {
       console.log("[Room Store] Room marked as occupied:", key);
       room.hasBeenOccupied = true;
     }
-    if (gameMode && !room.gameMode) {
-      room.gameMode = gameMode;
-    }
     if (creatorName && !room.creatorName) {
       room.creatorName = creatorName;
     }
@@ -154,7 +151,7 @@ export function occupyRoom(code, gameMode, creatorName) {
       createdAt: Date.now(),
       hasBeenOccupied: true,
       members: [],
-      gameMode: gameMode || "advanced_game",
+      gameMode: "standard",
       creatorName: creatorName || "",
       isGameStarted: false,
       activePlayers: [],
@@ -171,7 +168,7 @@ export function getRoom(code) {
   return activeRooms.get(key) || null;
 }
 
-export async function isValidRoom(code) {
+export async function isValidRoom(code, role = null) {
   const key = code.toUpperCase();
   
   if (!activeRooms.has(key)) {
@@ -182,7 +179,7 @@ export async function isValidRoom(code) {
         createdAt: Date.now(),
         hasBeenOccupied: true,
         members: [],
-        gameMode: "advanced_game",
+        gameMode: "standard",
         creatorName: "",
         isGameStarted: false,
         activePlayers: [],
@@ -191,7 +188,7 @@ export async function isValidRoom(code) {
         history: [],
         mafiaSelections: {}
       });
-      return { valid: true, gameMode: "advanced_game", creatorName: "" };
+      return { valid: true, creatorName: "" };
     }
     console.log("[Room Store] Validating room:", key, "-> false (not found)");
     return { valid: false, error: "Room not found." };
@@ -200,11 +197,7 @@ export async function isValidRoom(code) {
   const room = activeRooms.get(key);
   const occupiedStatus = await checkChannelOccupied(key);
 
-  if (occupiedStatus === true) {
-    room.hasBeenOccupied = true;
-    console.log("[Room Store] Validating room:", key, "-> true (occupied channel on Pusher), mode:", room.gameMode);
-    return { valid: true, gameMode: room.gameMode, creatorName: room.creatorName };
-  } else if (occupiedStatus === false) {
+  if (occupiedStatus === false) {
     if (room.hasBeenOccupied) {
       console.log("[Room Store] Validating room:", key, "-> false (was occupied but is now empty. Destroying)");
       activeRooms.delete(key);
@@ -217,13 +210,36 @@ export async function isValidRoom(code) {
       activeRooms.delete(key);
       return { valid: false, error: "Room has expired." };
     }
-    
-    console.log("[Room Store] Validating room:", key, "-> true (in grace period), mode:", room.gameMode);
-    return { valid: true, gameMode: room.gameMode, creatorName: room.creatorName };
-  } else {
-    console.log("[Room Store] Validating room:", key, "-> true (Pusher check failed, falling back to cache), mode:", room.gameMode);
-    return { valid: true, gameMode: room.gameMode, creatorName: room.creatorName };
   }
+
+  if (occupiedStatus === true) {
+    room.hasBeenOccupied = true;
+  }
+
+  // Prevent selecting more than 3 Mafia players
+  if (role === "mafia" && room) {
+    try {
+      const pusher = getPusherServer();
+      const channelName = `presence-room-${key}`;
+      const res = await pusher.get({ path: `/channels/${channelName}/users` });
+      if (res.status === 200) {
+        const data = await res.json();
+        const activeIds = new Set((data.users || []).map(u => u.id));
+        if (room.members) {
+          room.members = room.members.filter(m => activeIds.has(m.id));
+        }
+      }
+    } catch (e) {
+      // Ignore query error and use local room.members cache
+    }
+
+    const mafiaCount = (room.members || []).filter(m => m.role === "mafia").length;
+    if (mafiaCount >= 3) {
+      return { valid: false, error: "Cannot select Mafia: Maximum of 3 Mafia players already reached for this room. Please select another role." };
+    }
+  }
+
+  return { valid: true, creatorName: room.creatorName };
 }
 
 export function addMember(code, member) {
@@ -234,7 +250,7 @@ export function addMember(code, member) {
       createdAt: Date.now(),
       hasBeenOccupied: true,
       members: [],
-      gameMode: "advanced_game",
+      gameMode: "standard",
       creatorName: "",
       isGameStarted: false,
       activePlayers: [],
@@ -248,7 +264,10 @@ export function addMember(code, member) {
   if (!room.members) {
     room.members = [];
   }
-  if (!room.members.some(m => m.displayName === member.displayName)) {
+  const existingIdx = room.members.findIndex(m => m.displayName === member.displayName);
+  if (existingIdx !== -1) {
+    room.members[existingIdx] = member;
+  } else {
     room.members.push(member);
   }
   room.hasBeenOccupied = true;

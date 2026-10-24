@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPusherServer } from "@/lib/pusher-server";
-import { occupyRoom } from "@/lib/room-store";
+import { occupyRoom, addMember, getRoom } from "@/lib/room-store";
 
 export async function POST(req) {
   try {
@@ -9,10 +9,9 @@ export async function POST(req) {
     const channelName = data.get("channel_name");
     const displayName = data.get("displayName");
     const role = data.get("role");
-    const gameMode = data.get("gameMode");
     const creatorName = data.get("creatorName");
 
-    console.log("[Pusher Auth] channelName:", channelName, "displayName:", displayName, "role:", role, "gameMode:", gameMode, "creatorName:", creatorName);
+    console.log("[Pusher Auth] channelName:", channelName, "displayName:", displayName, "role:", role, "creatorName:", creatorName);
 
     if (!socketId || !channelName) {
       return NextResponse.json({ error: "Missing socket_id or channel_name" }, { status: 400 });
@@ -23,6 +22,19 @@ export async function POST(req) {
       if (role !== "mafia") {
         console.warn("[Pusher Auth] Blocked non-mafia attempt to join mafia channel:", displayName, "role:", role);
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      }
+    }
+
+    // Prevent selecting/joining with more than 3 Mafia players
+    if (channelName.startsWith("presence-room-") && !channelName.endsWith("-mafia") && role === "mafia") {
+      const roomCode = channelName.substring("presence-room-".length);
+      const room = getRoom(roomCode);
+      if (room && room.members) {
+        const mafiaMembers = room.members.filter(m => m.role === "mafia" && m.displayName !== displayName);
+        if (mafiaMembers.length >= 3) {
+          console.warn("[Pusher Auth] Blocked join: Maximum 3 Mafia reached for room", roomCode);
+          return NextResponse.json({ error: "Maximum of 3 Mafia players allowed for this room." }, { status: 403 });
+        }
       }
     }
 
@@ -45,7 +57,11 @@ export async function POST(req) {
     if (channelName.startsWith("presence-room-")) {
       const cleanName = channelName.replace("-mafia", "");
       const roomCode = cleanName.substring("presence-room-".length);
-      occupyRoom(roomCode, gameMode, creatorName);
+      occupyRoom(roomCode, "standard", creatorName);
+
+      if (!channelName.endsWith("-mafia") && displayName && role) {
+        addMember(roomCode, { id: socketId, displayName, role });
+      }
     }
 
     return NextResponse.json(authResponse);
