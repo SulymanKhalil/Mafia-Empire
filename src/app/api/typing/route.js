@@ -3,7 +3,7 @@ import { getPusherServer, getRoomChannel } from "@/lib/pusher-server";
 
 export async function POST(req) {
   try {
-    const { role, roomCode, displayName, isTyping } = await req.json();
+    const { role, roomCode, socketId, isTyping } = await req.json();
     if (!roomCode) return NextResponse.json({ error: "roomCode required" }, { status: 400 });
 
     const pusher = getPusherServer();
@@ -11,7 +11,7 @@ export async function POST(req) {
 
     await pusher.trigger(channel, "typing-update", {
       role,
-      displayName: displayName || "Someone",
+      socketId,
       isTyping: !!isTyping,
     });
 

@@ -163,43 +163,27 @@ function ParticleField({ count = 18 }) {
 }
 
 // ── API helpers ──────────────────────────────────────────────────────────────
-async function apiJoin(role, roomCode, displayName) {
-  await fetch("/api/join", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, roomCode, displayName }),
-  });
-}
-
-async function apiLeave(role, roomCode, displayName) {
-  await fetch("/api/leave", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, roomCode, displayName }),
-  });
-}
-
-async function apiMessage(text, role, roomCode, displayName) {
+async function apiMessage(text, role, roomCode) {
   await fetch("/api/message", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, role, roomCode, displayName }),
+    body: JSON.stringify({ text, role, roomCode }),
   });
 }
 
-async function apiTyping(role, roomCode, displayName, isTyping) {
+async function apiTyping(role, roomCode, socketId, isTyping) {
   await fetch("/api/typing", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, roomCode, displayName, isTyping }),
+    body: JSON.stringify({ role, roomCode, socketId, isTyping }),
   });
 }
 
-async function apiReaction(role, roomCode, messageId, emoji, displayName) {
+async function apiReaction(role, roomCode, messageId, emoji) {
   await fetch("/api/reaction", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, roomCode, messageId, emoji, displayName }),
+    body: JSON.stringify({ role, roomCode, messageId, emoji }),
   });
 }
 
@@ -223,10 +207,12 @@ async function apiValidateRoom(roomCode) {
 
 const ROLES = [
   { id: "mafia", name: "Mafia", icon: "fa-skull", color: "#fc8181", bg: "rgba(229,62,62,0.12)", border: "rgba(229,62,62,0.45)", hoverBg: "rgba(229,62,62,0.05)", hoverBorder: "rgba(229,62,62,0.25)", desc: "Hidden in the shadows" },
-  { id: "civilian", name: "Civilian", icon: "fa-person", color: "#38bdf8", bg: "rgba(14,165,233,0.12)", border: "rgba(14,165,233,0.45)", hoverBg: "rgba(14,165,233,0.05)", hoverBorder: "rgba(14,165,233,0.25)", desc: "Voice of the town" },
-  { id: "detective", name: "Detective", icon: "fa-user-secret", color: "#c084fc", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.45)", hoverBg: "rgba(168,85,247,0.05)", hoverBorder: "rgba(168,85,247,0.25)", desc: "Seeking the truth" },
-  { id: "doctor", name: "Doctor", icon: "fa-user-doctor", color: "#2dd4bf", bg: "rgba(45,212,191,0.12)", border: "rgba(45,212,191,0.45)", hoverBg: "rgba(45,212,191,0.05)", hoverBorder: "rgba(45,212,191,0.25)", desc: "Saving lives" }
+  { id: "civilian", name: "Civilian", icon: "fa-person", color: "#38bdf8", bg: "rgba(14,165,233,0.12)", border: "rgba(14,165,233,0.45)", hoverBg: "rgba(14,165,233,0.05)", hoverBorder: "rgba(14,165,233,0.25)", desc: "Voice of the town" }
 ];
+
+function getRoleName(role) {
+  return ROLES.find((r) => r.id === role)?.name || "Player";
+}
 
 // ── Shared background decorations ────────────────────────────────────────────
 function BgDecorations() {
@@ -260,58 +246,28 @@ function Lobby({ onEnter }) {
   // step: "role" | "create" | "join"
   const [step, setStep] = useState("role");
   const [role, setRole] = useState(null);
-  const [displayName, setDisplayName] = useState("");
-  const [nameError, setNameError] = useState("");
-  const [nextAction, setNextAction] = useState(null);
   const [createdCode, setCreatedCode] = useState(null);
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState("");
   const [joinError, setJoinError] = useState("");
   const [validating, setValidating] = useState(false);
 
-  const trimmedName = displayName.trim();
-  const canProceed = trimmedName.length >= 2;
-
   const handleCreateRoom = async () => {
     const code = generateRoomCode();
     setCreatedCode(code);
     setStep("create");
-    setNextAction(null);
     // Register the code server-side so others can validate against it
     await apiRegisterRoom(code);
   };
 
   const handleChooseCreate = () => {
     if (!role) return;
-    setNextAction("create");
-    setStep("name");
-    setNameError("");
+    handleCreateRoom();
   };
 
   const handleChooseJoin = () => {
     if (!role) return;
-    setNextAction("join");
-    setStep("name");
-    setNameError("");
-  };
-
-  const handleNameContinue = async () => {
-    if (!canProceed) {
-      setNameError("Choose a display name with at least 2 characters.");
-      return;
-    }
-
-    if (nextAction === "create") {
-      await handleCreateRoom();
-      return;
-    }
-
-    if (nextAction === "join") {
-      setStep("join");
-      return;
-    }
-
-    setNameError("Please pick Create or Join first.");
+    setStep("join");
   };
 
   const handleCopy = () => {
@@ -335,21 +291,8 @@ function Lobby({ onEnter }) {
       setJoinError("Please enter a valid code");
       return;
     }
-    onEnter(role, code, trimmedName);
+    onEnter(role, code);
   };
-
-  const handleStartName = () => {
-    if (!role) return;
-    setStep("name");
-    setNameError("");
-  };
-
-  const handleJoinFlow = () => {
-    setStep("join");
-    setJoinError("");
-  };
-
-  const roleName = ROLES.find((r) => r.id === role)?.name || "Player";
 
   return (
     <div
@@ -518,95 +461,6 @@ function Lobby({ onEnter }) {
             </>
           )}
 
-          {/* ── Step: Display Name ── */}
-          {step === "name" && (
-            <>
-              <button
-                onClick={() => { setStep("role"); setNameError(""); setNextAction(null); }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "0.72rem",
-                  color: "rgba(255,255,255,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  padding: 0,
-                  marginBottom: "1.25rem",
-                  transition: "color 0.2s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
-              >
-                <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.6rem" }} />
-                Back
-              </button>
-
-              <p style={{ fontFamily: "'Syne', sans-serif", fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: "1rem" }}>
-                Enter a Display Name
-              </p>
-
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => {
-                  setDisplayName(e.target.value);
-                  setNameError("");
-                }}
-                onKeyDown={(e) => { if (e.key === "Enter") handleNameContinue(); }}
-                placeholder="ie: Shadow Fox"
-                maxLength={24}
-                style={{
-                  width: "100%",
-                  background: "rgba(255,255,255,0.04)",
-                  border: nameError ? "1px solid rgba(229,62,62,0.5)" : "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "0.875rem",
-                  padding: "0.875rem 1rem",
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  color: "#fff",
-                  outline: "none",
-                  caretColor: "#ffffff",
-                  marginBottom: "0.75rem",
-                  boxSizing: "border-box",
-                  transition: "border-color 0.2s ease",
-                }}
-                onFocus={(e) => { if (!nameError) e.target.style.borderColor = "rgba(255,255,255,0.3)"; }}
-                onBlur={(e) => { if (!nameError) e.target.style.borderColor = "rgba(255,255,255,0.1)"; }}
-              />
-
-              {nameError && (
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", color: "#fc8181", marginBottom: "0.75rem" }}>
-                  {nameError}
-                </p>
-              )}
-
-              <button
-                onClick={handleNameContinue}
-                style={{
-                  width: "100%",
-                  padding: "0.875rem",
-                  borderRadius: "0.875rem",
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "0.8rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  background: canProceed ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.04)",
-                  color: canProceed ? "#000" : "rgba(255,255,255,0.2)",
-                  border: canProceed ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.06)",
-                  cursor: canProceed ? "pointer" : "not-allowed",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                Continue
-              </button>
-            </>
-          )}
-
           {/* ── Step: Create ── */}
           {step === "create" && (
             <>
@@ -684,7 +538,7 @@ function Lobby({ onEnter }) {
 
               {/* Enter Room */}
               <button
-                onClick={() => onEnter(role, createdCode, trimmedName)}
+                onClick={() => onEnter(role, createdCode)}
                 style={{
                   width: "100%",
                   padding: "0.875rem",
@@ -814,7 +668,7 @@ function Lobby({ onEnter }) {
 }
 
 // ── Chat Room ────────────────────────────────────────────────────────────────
-function ChatRoom({ role, roomCode, displayName, onExit }) {
+function ChatRoom({ role, roomCode, onExit }) {
   const [messages, setMessages] = useState([]);
   const [members, setMembers] = useState([]);
   const [typingMembers, setTypingMembers] = useState([]);
@@ -822,6 +676,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [pusherError, setPusherError] = useState(false);
+  const [joinError, setJoinError] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const isTypingRef = useRef(false);
   const bottomRef = useRef(null);
@@ -849,7 +704,6 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           endpoint: "/api/pusher/auth",
           transport: "ajax",
           params: {
-            displayName,
             role,
           },
         },
@@ -858,20 +712,21 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
       const channel = pusherRef.current.subscribe(pusherChannel);
       channelRef.current = channel;
 
+      channel.bind("pusher:subscription_error", (error) => {
+        if (role === "mafia" && error?.status === 403) {
+          setJoinError("This room already has a Mafia. Only one Mafia player is allowed per room.");
+        }
+      });
+
       channel.bind("pusher:subscription_succeeded", (presenceMembers) => {
         const memberList = [];
         presenceMembers.each((member) => {
           memberList.push({
             id: member.id,
-            displayName: member.info.displayName,
             role: member.info.role,
           });
         });
         setMembers(memberList);
-        setMessages((prev) => [
-          ...prev,
-          { type: "system", text: `${displayName} joined the room`, timestamp: Date.now() },
-        ]);
       });
 
       channel.bind("pusher:member_added", (member) => {
@@ -881,24 +736,15 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
             ...prev,
             {
               id: member.id,
-              displayName: member.info.displayName,
               role: member.info.role,
             },
           ];
         });
-        setMessages((prev) => [
-          ...prev,
-          { type: "system", text: `${member.info.displayName} joined the room`, timestamp: Date.now() },
-        ]);
       });
 
       channel.bind("pusher:member_removed", (member) => {
         setMembers((prev) => prev.filter((m) => m.id !== member.id));
-        setTypingMembers((prev) => prev.filter((tm) => tm.displayName !== member.info.displayName));
-        setMessages((prev) => [
-          ...prev,
-          { type: "system", text: `${member.info.displayName} left the room`, timestamp: Date.now() },
-        ]);
+        setTypingMembers((prev) => prev.filter((tm) => tm.socketId !== member.id));
       });
 
       channel.bind("new-message", (data) => {
@@ -906,13 +752,13 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
       });
 
       channel.bind("typing-update", (data) => {
-        if (!data || data.displayName === displayName) return;
+        if (!data || data.socketId === pusherRef.current?.connection.socket_id) return;
         setTypingMembers((prev) => {
           if (!data.isTyping) {
-            return prev.filter((member) => member.displayName !== data.displayName);
+            return prev.filter((member) => member.socketId !== data.socketId);
           }
-          if (prev.some((member) => member.displayName === data.displayName)) return prev;
-          return [...prev, { displayName: data.displayName, role: data.role }];
+          if (prev.some((member) => member.socketId === data.socketId)) return prev;
+          return [...prev, { socketId: data.socketId, role: data.role }];
         });
       });
 
@@ -920,7 +766,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         if (!data?.messageId) return;
         setReactions((prev) => ({
           ...prev,
-          [data.messageId]: [...(prev[data.messageId] || []), { emoji: data.emoji, displayName: data.displayName }],
+          [data.messageId]: [...(prev[data.messageId] || []), { emoji: data.emoji, role: data.role }],
         }));
       });
 
@@ -946,16 +792,16 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         typingTimeoutRef.current = null;
       }
       if (isTypingRef.current) {
-        apiTyping(role, roomCode, displayName, false).catch(() => {});
+        apiTyping(role, roomCode, pusherRef.current?.connection.socket_id, false).catch(() => {});
       }
     };
-  }, [role, roomCode, displayName]);
+  }, [role, roomCode]);
 
   const flushTyping = () => {
     if (!isTypingRef.current) return;
     isTypingRef.current = false;
     setIsTyping(false);
-    apiTyping(role, roomCode, displayName, false).catch(() => {});
+    apiTyping(role, roomCode, pusherRef.current?.connection.socket_id, false).catch(() => {});
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
@@ -972,7 +818,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
     if (!isTypingRef.current) {
       isTypingRef.current = true;
       setIsTyping(true);
-      apiTyping(role, roomCode, displayName, true).catch(() => {});
+      apiTyping(role, roomCode, pusherRef.current?.connection.socket_id, true).catch(() => {});
     }
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -980,7 +826,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
     typingTimeoutRef.current = setTimeout(() => {
       isTypingRef.current = false;
       setIsTyping(false);
-      apiTyping(role, roomCode, displayName, false).catch(() => {});
+      apiTyping(role, roomCode, pusherRef.current?.connection.socket_id, false).catch(() => {});
       typingTimeoutRef.current = null;
     }, 1200);
   };
@@ -991,7 +837,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
     setSending(true);
     setInput("");
     flushTyping();
-    await apiMessage(text, role, roomCode, displayName);
+    await apiMessage(text, role, roomCode);
     setSending(false);
     inputRef.current?.focus();
   };
@@ -1060,6 +906,46 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+        >
+          Return to Lobby
+        </button>
+      </div>
+    );
+  }
+
+  if (joinError) {
+    return (
+      <div
+        style={{
+          height: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          gap: "1.5rem",
+          background: "#000000",
+          color: "#fff",
+          padding: "2rem",
+          textAlign: "center",
+        }}
+      >
+        <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: "3rem", color: "#eab308" }} />
+        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.9rem", color: "rgba(255,255,255,0.8)", maxWidth: "24rem", lineHeight: 1.5 }}>
+          {joinError}
+        </p>
+        <button
+          onClick={onExit}
+          style={{
+            padding: "0.75rem 1.5rem",
+            borderRadius: "0.875rem",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            color: "#fff",
+            cursor: "pointer",
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 700,
+            fontSize: "0.8rem",
+          }}
         >
           Return to Lobby
         </button>
@@ -1214,7 +1100,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
             }}
           >
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.72)" }}>
-              Playing as <strong style={{ color: "#fff" }}>{displayName}</strong> · <strong style={{ color: currentRoleObj.color }}>{currentRoleObj.name}</strong>
+              Playing as <strong style={{ color: currentRoleObj.color }}>{currentRoleObj.name}</strong>
             </span>
           </div>
           <div
@@ -1235,11 +1121,11 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
           </div>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
-          {members.map((member, idx) => {
-            const memberRole = ROLES.find((r) => r.id === member.role) || { color: "#fff", bg: "rgba(255,255,255,0.06)" };
+          {members.map((member) => {
+            const memberRole = ROLES.find((r) => r.id === member.role) || { name: "Player", color: "#fff", bg: "rgba(255,255,255,0.06)" };
             return (
               <span
-                key={`${member.displayName}-${idx}`}
+                key={member.id}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1254,14 +1140,15 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
                 }}
               >
                 <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "999px", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.08)", color: memberRole.color, fontWeight: 700 }}>
-                  {getInitials(member.displayName)}
+                  {getInitials(memberRole.name)}
                 </span>
-                {member.displayName}
+                {memberRole.name}
               </span>
             );
           })}
         </div>
 
+        <hr style={{ width: "100%", border: 0, borderTop: "1px solid rgba(255,255,255,0.08)", margin: "0 0 0.75rem" }} />
 
         {messages.length === 0 && (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", textAlign: "center", padding: "2rem" }}>
@@ -1306,7 +1193,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
             bg: "rgba(59,130,246,0.12)",
           };
 
-          const initials = getInitials(msg.sender);
+          const initials = getInitials(msgRoleObj.name);
 
           return (
             <div key={i} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", animation: "message-slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)" }}>
@@ -1349,11 +1236,8 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
               {/* Message bubble + reactions */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", padding: "0 0.25rem" }}>
-                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", letterSpacing: "0.05em", color: msgRoleObj.color }}>
-                    {msg.sender}
-                  </span>
-                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.65rem", letterSpacing: "0.02em", color: "rgba(255,255,255,0.3)" }}>
-                    - {msgRoleObj.name}
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", letterSpacing: "0.05em", color: msg.role === "civilian" ? "#9ca3af" : msgRoleObj.color }}>
+                    {msgRoleObj.name}
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: "0.35rem", alignItems: "flex-start" }}>
@@ -1407,7 +1291,7 @@ function ChatRoom({ role, roomCode, displayName, onExit }) {
         {typingMembers.length > 0 && (
           <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: "0.4rem", marginBottom: "0.7rem", fontSize: "0.75rem", color: "rgba(200,200,200,0.6)", fontStyle: "italic" }}>
             <span style={{ fontFamily: "'Syne', sans-serif", color: "rgba(255,255,255,0.7)" }}>
-              {typingMembers.map((tm) => tm.displayName).join(", ")} is typing
+              {typingMembers.map((tm) => getRoleName(tm.role)).join(", ")} is typing
             </span>
             <span style={{ display: "flex", gap: "0.15rem", animation: "pulse 1.5s infinite" }}>
               <span style={{ animation: "pulse 1.5s infinite 0s", display: "inline-block" }}>•</span>
@@ -1486,22 +1370,19 @@ export default function App() {
   const [screen, setScreen] = useState("lobby");
   const [role, setRole] = useState(null);
   const [roomCode, setRoomCode] = useState(null);
-  const [displayName, setDisplayName] = useState("");
 
-  const handleEnter = (selectedRole, code, name) => {
+  const handleEnter = (selectedRole, code) => {
     setRole(selectedRole);
     setRoomCode(code);
-    setDisplayName(name);
     setScreen("chat");
   };
 
   const handleExit = () => {
     setRole(null);
     setRoomCode(null);
-    setDisplayName("");
     setScreen("lobby");
   };
 
   if (screen === "lobby") return <Lobby onEnter={handleEnter} />;
-  return <ChatRoom role={role} roomCode={roomCode} displayName={displayName} onExit={handleExit} />;
+  return <ChatRoom role={role} roomCode={roomCode} onExit={handleExit} />;
 }
