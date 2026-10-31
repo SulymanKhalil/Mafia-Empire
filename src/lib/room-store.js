@@ -216,8 +216,8 @@ export async function isValidRoom(code, role = null) {
     room.hasBeenOccupied = true;
   }
 
-  // Prevent selecting more than 3 Mafia players
-  if (role === "mafia" && room) {
+  // Prevent selecting more than allowed role limits
+  if (role && room) {
     try {
       const pusher = getPusherServer();
       const channelName = `presence-room-${key}`;
@@ -233,9 +233,25 @@ export async function isValidRoom(code, role = null) {
       // Ignore query error and use local room.members cache
     }
 
-    const mafiaCount = (room.members || []).filter(m => m.role === "mafia").length;
-    if (mafiaCount >= 3) {
-      return { valid: false, error: "Cannot select Mafia: Maximum of 3 Mafia players already reached for this room. Please select another role." };
+    if (role === "mafia") {
+      const mafiaCount = (room.members || []).filter(m => m.role === "mafia").length;
+      if (mafiaCount >= 3) {
+        return { valid: false, error: "Cannot select Mafia: Maximum of 3 Mafia players already reached for this room. Please select another role." };
+      }
+    }
+
+    if (role === "doctor") {
+      const doctorCount = (room.members || []).filter(m => m.role === "doctor").length;
+      if (doctorCount >= 1) {
+        return { valid: false, error: "Cannot select Doctor: Maximum of 1 Doctor player already reached for this room. Please select another role." };
+      }
+    }
+
+    if (role === "detective") {
+      const detectiveCount = (room.members || []).filter(m => m.role === "detective").length;
+      if (detectiveCount >= 1) {
+        return { valid: false, error: "Cannot select Detective: Maximum of 1 Detective / Investigator player already reached for this room. Please select another role." };
+      }
     }
   }
 

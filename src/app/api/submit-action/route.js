@@ -6,8 +6,13 @@ import { getPusherServer } from "@/lib/pusher-server";
 export async function POST(req) {
   try {
     const { roomCode, displayName, role, target } = await req.json();
-    if (!roomCode || !displayName || !role) {
+    if (!roomCode || !displayName || !role || !target) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Prevent self-voting
+    if (target === displayName) {
+      return NextResponse.json({ error: "Self-voting is not allowed." }, { status: 400 });
     }
 
     const room = getRoom(roomCode);

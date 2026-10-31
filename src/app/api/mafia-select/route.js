@@ -10,6 +10,11 @@ export async function POST(req) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Prevent self-voting
+    if (target === displayName) {
+      return NextResponse.json({ error: "Self-voting is not allowed." }, { status: 400 });
+    }
+
     const room = getRoom(roomCode);
     if (!room) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });

@@ -193,10 +193,10 @@ async function apiTyping(role, roomCode, displayName, isTyping) {
 }
 
 const ROLES = [
-  { id: "mafia", name: "Mafia", icon: "fa-skull", color: "#ef4444", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.45)", glow: "rgba(239,68,68,0.25)", hoverBg: "rgba(239,68,68,0.05)", hoverBorder: "rgba(239,68,68,0.25)", desc: "Hidden in the shadows" },
-  { id: "civilian", name: "Civilian", icon: "fa-person", color: "#eab308", bg: "rgba(234,179,8,0.12)", border: "rgba(234,179,8,0.45)", glow: "rgba(234,179,8,0.25)", hoverBg: "rgba(234,179,8,0.05)", hoverBorder: "rgba(234,179,8,0.25)", desc: "Voice of the town" },
-  { id: "doctor", name: "Doctor", icon: "fa-user-doctor", color: "#22c55e", bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.45)", glow: "rgba(34,197,94,0.25)", hoverBg: "rgba(34,197,94,0.05)", hoverBorder: "rgba(34,197,94,0.25)", desc: "Saving lives" },
-  { id: "detective", name: "Detective", icon: "fa-user-secret", color: "#a855f7", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.45)", glow: "rgba(168,85,247,0.25)", hoverBg: "rgba(168,85,247,0.05)", hoverBorder: "rgba(168,85,247,0.25)", desc: "Seeking the truth" }
+  { id: "mafia", name: "Mafia", icon: "fa-skull", color: "#f87171", bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.45)", glow: "rgba(248,113,113,0.22)", hoverBg: "rgba(248,113,113,0.06)", hoverBorder: "rgba(248,113,113,0.3)", desc: "Hidden in the shadows" },
+  { id: "civilian", name: "Civilian", icon: "fa-person", color: "#fde047", bg: "rgba(253,224,71,0.12)", border: "rgba(253,224,71,0.45)", glow: "rgba(253,224,71,0.22)", hoverBg: "rgba(253,224,71,0.06)", hoverBorder: "rgba(253,224,71,0.3)", desc: "Voice of the town" },
+  { id: "doctor", name: "Doctor", icon: "fa-user-doctor", color: "#4ade80", bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.45)", glow: "rgba(74,222,128,0.22)", hoverBg: "rgba(74,222,128,0.06)", hoverBorder: "rgba(74,222,128,0.3)", desc: "Saving lives" },
+  { id: "detective", name: "Detective", icon: "fa-user-secret", color: "#c084fc", bg: "rgba(192,132,252,0.12)", border: "rgba(192,132,252,0.45)", glow: "rgba(192,132,252,0.22)", hoverBg: "rgba(192,132,252,0.06)", hoverBorder: "rgba(192,132,252,0.3)", desc: "Seeking the truth" }
 ];
 
 // ── Shared background decorations ────────────────────────────────────────────
@@ -294,13 +294,13 @@ function Lobby({ onEnter }) {
       <BgDecorations />
       <ParticleField count={22} />
 
-      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: "25rem" }}>
+      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: "350px" }}>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 8px #e53e3e" }} />
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.7rem", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>
-              Mafia Empire
+              Mafia vs Civilians
             </span>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 8px #e53e3e" }} />
           </div>
@@ -834,7 +834,8 @@ function Lobby({ onEnter }) {
 }
 
 // ── ChatRoom ─────────────────────────────────────────────────────────────────
-function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
+function ChatRoom({ role: initialRole, roomCode, displayName, initialCreatorName, onExit }) {
+  const [role, setRole] = useState(initialRole || "civilian");
   const [messages, setMessages] = useState([]);
   const [mafiaMessages, setMafiaMessages] = useState([]);
   const [members, setMembers] = useState([]);
@@ -855,9 +856,35 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
   const [activeScreen, setActiveScreen] = useState("action");
   const [chatTab, setChatTab] = useState("public"); // public | mafia
 
+  // Unread indicators
+  const [unreadPublic, setUnreadPublic] = useState(false);
+  const [unreadMafia, setUnreadMafia] = useState(false);
+  const activeScreenRef = useRef("action");
+  const chatTabRef = useRef("public");
+
+  useEffect(() => {
+    activeScreenRef.current = activeScreen;
+    chatTabRef.current = chatTab;
+    if (activeScreen === "chat") {
+      if (chatTab === "public") setUnreadPublic(false);
+      if (chatTab === "mafia") setUnreadMafia(false);
+    }
+  }, [activeScreen, chatTab]);
+
   // Game Creator Permission
   const [creatorName, setCreatorName] = useState(initialCreatorName || "");
   const isCreator = displayName === creatorName;
+
+  // Role validation counts (from presence members who joined with their chosen roles)
+  const mafiaCount = members.filter(m => m.role === 'mafia').length;
+  const civilianCount = members.filter(m => m.role === 'civilian').length;
+  const detectiveCount = members.filter(m => m.role === 'detective').length;
+  const doctorCount = members.filter(m => m.role === 'doctor').length;
+
+  const isConfigValid = mafiaCount >= 1 && mafiaCount <= 3 && civilianCount >= 4 && detectiveCount <= 1 && doctorCount <= 1;
+
+  const [startingGame, setStartingGame] = useState(false);
+  const [startError, setStartError] = useState("");
 
   // Classic Mafia Game Action states
   const [isGameStarted, setIsGameStarted] = useState(false);
@@ -878,23 +905,16 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
 
   const pusherChannel = `presence-room-${roomCode}`;
 
-  // Role validation counts
-  const mafiaCount = members.filter(m => m.role === 'mafia').length;
-  const civilianCount = members.filter(m => m.role === 'civilian').length;
-  const detectiveCount = members.filter(m => m.role === 'detective').length;
-  const doctorCount = members.filter(m => m.role === 'doctor').length;
-
-  const isConfigValid = mafiaCount >= 1 && mafiaCount <= 3 && civilianCount >= 4 && detectiveCount <= 1 && doctorCount <= 1;
-
   // Sync state on load
   useEffect(() => {
     const syncState = async () => {
       try {
-        const res = await fetch(`/api/room-state?roomCode=${roomCode}`);
+        const res = await fetch(`/api/room-state?roomCode=${roomCode}&displayName=${encodeURIComponent(displayName)}`);
         if (res.ok) {
           const data = await res.json();
           if (data.creatorName) setCreatorName(data.creatorName);
-          setIsGameStarted(data.isGameStarted);
+          setIsGameStarted(!!data.isGameStarted);
+          if (data.myRole) setRole(data.myRole);
           setHistory(data.history || []);
           setMafiaSelections(data.mafiaSelections || {});
 
@@ -919,7 +939,7 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
     syncState();
   }, [roomCode, displayName]);
 
-  // Pusher setup
+  // Main Pusher setup
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
@@ -992,6 +1012,12 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
 
       channel.bind("new-message", (data) => {
         setMessages((prev) => [...prev, { ...data, type: "message" }]);
+        if (data.sender !== displayName) {
+          const isViewingPublic = activeScreenRef.current === "chat" && chatTabRef.current === "public";
+          if (!isViewingPublic) {
+            setUnreadPublic(true);
+          }
+        }
       });
 
       channel.bind("typing-update", (data) => {
@@ -1006,10 +1032,22 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
       });
 
       // Creator Start Event
-      channel.bind("game-started", (data) => {
+      channel.bind("game-started", async (data) => {
         setIsGameStarted(true);
-        setRoundActivePlayers(data.activePlayers);
-        setGameRoundState("idle"); // start round transition
+        setRoundActivePlayers(data.activePlayers || []);
+        setGameRoundState("idle");
+
+        try {
+          const res = await fetch(`/api/room-state?roomCode=${roomCode}&displayName=${encodeURIComponent(displayName)}`);
+          if (res.ok) {
+            const stateData = await res.json();
+            if (stateData.myRole) {
+              setRole(stateData.myRole);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching private role on game-started:", err);
+        }
       });
 
       // Round Started broadcast
@@ -1039,36 +1077,44 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
         setGameRoundState("result");
       });
 
-      // Subscribe to Mafia Chat & Selections
-      let mafiaChannel = null;
-      if (role === "mafia") {
-        mafiaChannel = pusherRef.current.subscribe(`${pusherChannel}-mafia`);
-        mafiaChannelRef.current = mafiaChannel;
-
-        mafiaChannel.bind("new-mafia-message", (data) => {
-          setMafiaMessages((prev) => [...prev, { ...data, type: "message" }]);
-        });
-
-        // Sync live Mafia selections
-        mafiaChannel.bind("mafia-selection-updated", (data) => {
-          setMafiaSelections(data.mafiaSelections || {});
-        });
-      }
-
       return () => {
         channel.unbind_all();
-        pusherRef.current.unsubscribe(pusherChannel);
-        if (mafiaChannel) {
-          mafiaChannel.unbind_all();
-          pusherRef.current.unsubscribe(`${pusherChannel}-mafia`);
-        }
-        pusherRef.current.disconnect();
+        pusherRef.current?.unsubscribe(pusherChannel);
+        pusherRef.current?.disconnect();
       };
     } catch (err) {
       console.error("Failed to initialize Pusher:", err);
       setPusherError(true);
     }
-  }, [displayName, role, roomCode, creatorName]);
+  }, [displayName, roomCode, creatorName]);
+
+  // Subscribe to Mafia Chat & Selections whenever role is mafia
+  useEffect(() => {
+    if (role !== "mafia" || !pusherRef.current) return;
+    const mafiaChannel = pusherRef.current.subscribe(`${pusherChannel}-mafia`);
+    mafiaChannelRef.current = mafiaChannel;
+
+    mafiaChannel.bind("new-mafia-message", (data) => {
+      setMafiaMessages((prev) => [...prev, { ...data, type: "message" }]);
+      if (data.sender !== displayName) {
+        const isViewingMafia = activeScreenRef.current === "chat" && chatTabRef.current === "mafia";
+        if (!isViewingMafia) {
+          setUnreadMafia(true);
+        }
+      }
+    });
+
+    // Sync live Mafia selections
+    mafiaChannel.bind("mafia-selection-updated", (data) => {
+      setMafiaSelections(data.mafiaSelections || {});
+    });
+
+    return () => {
+      mafiaChannel.unbind_all();
+      pusherRef.current?.unsubscribe(`${pusherChannel}-mafia`);
+      mafiaChannelRef.current = null;
+    };
+  }, [role, pusherChannel, displayName]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1129,20 +1175,24 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
 
   // Creator starts game initially
   const handleStartGame = async () => {
+    if (!isConfigValid || startingGame) return;
+    setStartingGame(true);
+    setStartError("");
     try {
       const res = await fetch("/api/start-game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomCode, displayName, members })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.error) {
-          alert(data.error);
-        }
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setStartError(data.error || "Failed to start game.");
       }
     } catch (e) {
       console.error(e);
+      setStartError("Network error. Please try again.");
+    } finally {
+      setStartingGame(false);
     }
   };
 
@@ -1165,6 +1215,7 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
 
   // Live Mafia selection broadcast
   const handleMafiaCardClick = async (targetName) => {
+    if (targetName === displayName) return; // Prevent self-voting
     setSelectedTarget(targetName);
     if (role === "mafia") {
       try {
@@ -1181,7 +1232,7 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
 
   // Submit action target
   const handleSubmitAction = async () => {
-    if (!selectedTarget || submittingAction) return;
+    if (!selectedTarget || selectedTarget === displayName || submittingAction) return; // Prevent self-voting
     setSubmittingAction(true);
     try {
       const res = await fetch("/api/submit-action", {
@@ -1397,7 +1448,7 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
             History
           </button>
           <button 
-            onClick={() => { setActiveScreen("chat"); setChatTab("public"); }}
+            onClick={() => { setActiveScreen("chat"); setChatTab("public"); setUnreadPublic(false); }}
             style={{
               flex: 1,
               padding: "0.75rem 0.5rem",
@@ -1410,32 +1461,62 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
               fontWeight: 700,
               fontSize: "0.75rem",
               whiteSpace: "nowrap",
-              outline: "none"
+              outline: "none",
+              position: "relative"
             }}
           >
             <i className="fa-solid fa-comments" style={{ marginRight: "0.25rem" }} />
-            Public Chat
+            Civilian Chat
+            {unreadPublic && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "#f87171",
+                  boxShadow: "0 0 6px rgba(248,113,113,0.8)",
+                  marginLeft: "0.35rem",
+                  verticalAlign: "middle"
+                }}
+              />
+            )}
           </button>
           {role === "mafia" && (
             <button 
-              onClick={() => { setActiveScreen("chat"); setChatTab("mafia"); }}
+              onClick={() => { setActiveScreen("chat"); setChatTab("mafia"); setUnreadMafia(false); }}
               style={{
                 flex: 1,
                 padding: "0.75rem 0.5rem",
                 background: "none",
                 border: "none",
-                borderBottom: (activeScreen === "chat" && chatTab === "mafia") ? "2px solid #ef4444" : "none",
-                color: (activeScreen === "chat" && chatTab === "mafia") ? "#ef4444" : "rgba(255,255,255,0.45)",
+                borderBottom: (activeScreen === "chat" && chatTab === "mafia") ? "2px solid #f87171" : "none",
+                color: (activeScreen === "chat" && chatTab === "mafia") ? "#f87171" : "rgba(255,255,255,0.45)",
                 cursor: "pointer",
                 fontFamily: "'Syne', sans-serif",
                 fontWeight: 700,
                 fontSize: "0.75rem",
                 whiteSpace: "nowrap",
-                outline: "none"
+                outline: "none",
+                position: "relative"
               }}
             >
               <i className="fa-solid fa-skull" style={{ marginRight: "0.25rem" }} />
               Mafia Chat
+              {unreadMafia && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: "#f87171",
+                    boxShadow: "0 0 6px rgba(248,113,113,0.8)",
+                    marginLeft: "0.35rem",
+                    verticalAlign: "middle"
+                  }}
+                />
+              )}
             </button>
           )}
         </div>
@@ -1726,89 +1807,282 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
               </span>
             </div>
 
-            {/* Waiting for creator status initially */}
+            {/* Lobby View */}
             {!isGameStarted && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: "24rem", margin: "2rem auto", width: "100%" }}>
-                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "0.75rem", padding: "1.5rem", textAlign: "center" }}>
-                  <i className="fa-solid fa-hourglass" style={{ fontSize: "2.5rem", color: "rgba(255,255,255,0.15)", marginBottom: "1rem" }} />
-                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "1.05rem", color: "#fff", margin: "0 0 0.5rem 0" }}>
-                    Lobby State
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: "26rem", margin: "1.5rem auto", width: "100%" }}>
+                {/* Lobby Overview */}
+                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.75rem", padding: "1.25rem", textAlign: "center" }}>
+                  <div style={{ width: "2.75rem", height: "2.75rem", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "grid", placeItems: "center", margin: "0 auto 0.75rem auto" }}>
+                    <i className="fa-solid fa-users" style={{ fontSize: "1.2rem", color: "rgba(255,255,255,0.7)" }} />
+                  </div>
+                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "1.05rem", color: "#fff", margin: "0 0 0.35rem 0" }}>
+                    Game Lobby
                   </h3>
                   <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.5 }}>
-                    Wait for all players to join. Only the Room Creator can start the gameplay flow once the requirements are met.
+                    {isCreator
+                      ? "When all players have joined and requirements are met, click Start Game to begin."
+                      : `Waiting for the Room Creator (${creatorName || "Host"}) to start the game.`}
                   </p>
                 </div>
 
-                {/* Requirements check list */}
-                <div style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.75rem", padding: "1rem" }}>
-                  <h4 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: "#fff", margin: "0 0 0.6rem 0", textTransform: "uppercase" }}>
-                    Role Requirements:
-                  </h4>
-                  <ul style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.5)", margin: 0, paddingLeft: "1.2rem", lineHeight: 1.6 }}>
-                    <li style={{ color: mafiaCount >= 1 && mafiaCount <= 3 ? "#4ade80" : "#fc8181" }}>
-                      Mafia: Minimum 1, maximum 3 (Currently: {mafiaCount})
-                    </li>
-                    <li style={{ color: civilianCount >= 4 ? "#4ade80" : "#fc8181" }}>
-                      Civilian: Minimum 4 (Currently: {civilianCount})
-                    </li>
-                    <li style={{ color: detectiveCount <= 1 ? "#4ade80" : "#fc8181" }}>
-                      Detective: Optional{detectiveCount > 0 ? ` (${detectiveCount} selected)` : ""}
-                    </li>
-                    <li style={{ color: doctorCount <= 1 ? "#4ade80" : "#fc8181" }}>
-                      Doctor: Optional{doctorCount > 0 ? ` (${doctorCount} selected)` : ""}
-                    </li>
-                  </ul>
+                {/* Connected Players list */}
+                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.75rem", padding: "0.85rem 1rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.72rem", color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      Connected Players ({members.length})
+                    </span>
+                    {members.length < 5 && (
+                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.68rem", color: "#f87171" }}>
+                        {5 - members.length} more needed
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                    {members.map((m) => (
+                      <span
+                        key={m.displayName}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          padding: "0.35rem 0.65rem",
+                          borderRadius: "999px",
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: "0.75rem",
+                          color: "#ffffff",
+                        }}
+                      >
+                        <span style={{ width: "1.1rem", height: "1.1rem", borderRadius: "50%", background: "rgba(255,255,255,0.1)", display: "grid", placeItems: "center", fontSize: "0.55rem", fontWeight: 700 }}>
+                          {getInitials(m.displayName)}
+                        </span>
+                        {m.displayName}
+                        {m.displayName === displayName && " (You)"}
+                        {m.displayName === creatorName && " ★"}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Professional Game Requirements card */}
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "0.875rem",
+                    padding: "1.15rem 1.25rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <i className="fa-solid fa-shield-halved" style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.6)" }} />
+                      <span
+                        style={{
+                          fontFamily: "'Syne', sans-serif",
+                          fontWeight: 700,
+                          fontSize: "0.75rem",
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                          color: "rgba(255,255,255,0.85)",
+                        }}
+                      >
+                        Game Requirements
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: "0.72rem",
+                        color: "rgba(255,255,255,0.4)",
+                      }}
+                    >
+                      {members.length} {members.length === 1 ? "player" : "players"} connected
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                    {/* Mafia */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.55rem 0.8rem",
+                        borderRadius: "0.5rem",
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <i className="fa-solid fa-skull" style={{ color: "#f87171", fontSize: "0.8rem", width: "1rem" }} />
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", color: "#ffffff" }}>
+                          Mafia
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
+                          Max 3
+                        </span>
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: mafiaCount >= 1 && mafiaCount <= 3 ? "#4ade80" : "#f87171" }}>
+                          ({mafiaCount})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Civilian */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.55rem 0.8rem",
+                        borderRadius: "0.5rem",
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <i className="fa-solid fa-person" style={{ color: "#fde047", fontSize: "0.8rem", width: "1rem" }} />
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", color: "#ffffff" }}>
+                          Civilian
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
+                          Min 4
+                        </span>
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: civilianCount >= 4 ? "#4ade80" : "#f87171" }}>
+                          ({civilianCount}/4)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Doctor */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.55rem 0.8rem",
+                        borderRadius: "0.5rem",
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <i className="fa-solid fa-user-doctor" style={{ color: "#4ade80", fontSize: "0.8rem", width: "1rem" }} />
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", color: "#ffffff" }}>
+                          Doctor
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
+                          Optional, Max 1
+                        </span>
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: doctorCount <= 1 ? "#4ade80" : "#f87171" }}>
+                          ({doctorCount})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detective / Investigator */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.55rem 0.8rem",
+                        borderRadius: "0.5rem",
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <i className="fa-solid fa-user-secret" style={{ color: "#c084fc", fontSize: "0.8rem", width: "1rem" }} />
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", color: "#ffffff" }}>
+                          Detective
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
+                          Optional, Max 1
+                        </span>
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: detectiveCount <= 1 ? "#4ade80" : "#f87171" }}>
+                          ({detectiveCount})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
                   {!isConfigValid && (
                     <div
                       style={{
-                        marginTop: "0.85rem",
                         padding: "0.65rem 0.85rem",
                         borderRadius: "0.5rem",
-                        background: "rgba(239,68,68,0.08)",
-                        border: "1px solid rgba(239,68,68,0.25)",
+                        background: "rgba(248,113,113,0.08)",
+                        border: "1px solid rgba(248,113,113,0.25)",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.35rem", color: "#fc8181", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>
-                        <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: "0.7rem" }} />
-                        Requirements Not Met:
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.35rem", color: "#f87171", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>
+                        <i className="fa-solid fa-circle-exclamation" style={{ fontSize: "0.7rem" }} />
+                        Requirements Not Satisfied:
                       </div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.73rem", color: "#fc8181", display: "flex", flexDirection: "column", gap: "0.2rem", lineHeight: 1.4 }}>
-                        {mafiaCount < 1 && <div>• At least 1 Mafia player is required.</div>}
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.73rem", color: "#f87171", display: "flex", flexDirection: "column", gap: "0.2rem", lineHeight: 1.4 }}>
+                        {mafiaCount < 1 && <div>• At least 1 Mafia player is required to start the game.</div>}
                         {mafiaCount > 3 && <div>• Maximum 3 Mafia players allowed (currently {mafiaCount}).</div>}
-                        {civilianCount < 4 && <div>• At least 4 Civilian players are required (currently {civilianCount}/4).</div>}
-                        {detectiveCount > 1 && <div>• Maximum 1 Detective allowed (currently {detectiveCount}).</div>}
+                        {civilianCount < 4 && <div>• At least 4 Civilian players are required to start the game (currently {civilianCount}/4).</div>}
                         {doctorCount > 1 && <div>• Maximum 1 Doctor allowed (currently {doctorCount}).</div>}
+                        {detectiveCount > 1 && <div>• Maximum 1 Detective / Investigator allowed (currently {detectiveCount}).</div>}
                       </div>
                     </div>
                   )}
                 </div>
 
                 {isCreator ? (
-                  <button
-                    onClick={handleStartGame}
-                    disabled={!isConfigValid}
-                    style={{
-                      width: "100%",
-                      padding: "0.95rem",
-                      borderRadius: "0.75rem",
-                      fontFamily: "'Syne', sans-serif",
-                      fontWeight: 700,
-                      fontSize: "0.8rem",
-                      letterSpacing: "0.15em",
-                      textTransform: "uppercase",
-                      background: isConfigValid ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.03)",
-                      color: isConfigValid ? "#000" : "rgba(255,255,255,0.25)",
-                      border: isConfigValid ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.05)",
-                      cursor: isConfigValid ? "pointer" : "not-allowed",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    Start Game
-                  </button>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleStartGame}
+                      disabled={!isConfigValid || startingGame}
+                      style={{
+                        width: "100%",
+                        padding: "0.95rem",
+                        borderRadius: "0.75rem",
+                        fontFamily: "'Syne', sans-serif",
+                        fontWeight: 700,
+                        fontSize: "0.8rem",
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        background: isConfigValid && !startingGame ? "linear-gradient(135deg, #ffffff 0%, #e5e5e5 100%)" : "rgba(255,255,255,0.03)",
+                        color: isConfigValid && !startingGame ? "#000" : "rgba(255,255,255,0.25)",
+                        border: isConfigValid && !startingGame ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.05)",
+                        cursor: isConfigValid && !startingGame ? "pointer" : "not-allowed",
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <i className="fa-solid fa-play" style={{ fontSize: "0.75rem" }} />
+                      {startingGame ? "Starting Game..." : "Start Game"}
+                    </button>
+                    {startError && (
+                      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", color: "#f87171", textAlign: "center", margin: "0.5rem 0 0 0" }}>
+                        {startError}
+                      </p>
+                    )}
+                  </div>
                 ) : (
-                  <div style={{ textAlign: "center", fontSize: "0.8rem", color: "rgba(255,255,255,0.3)" }}>
-                    Waiting for the Room Creator to start the game...
+                  <div style={{ textAlign: "center", padding: "0.85rem", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "0.75rem" }}>
+                    <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "rgba(255,255,255,0.4)", margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                      <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: "0.75rem", color: "#f87171" }} />
+                      Waiting for the Room Creator to start the game...
+                    </p>
                   </div>
                 )}
               </div>
@@ -1879,57 +2153,55 @@ function ChatRoom({ role, roomCode, displayName, initialCreatorName, onExit }) {
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                      {roundActivePlayers.map((player) => {
-                        const isSelf = player.displayName === displayName;
-                        const isSelected = selectedTarget === player.displayName;
-                        
-                        const isSelectable = !isSelf || role === "doctor" || role === "civilian";
+                      {roundActivePlayers
+                        .filter((player) => player.displayName !== displayName)
+                        .map((player) => {
+                          const isSelected = selectedTarget === player.displayName;
 
-                        // Collect Mafia Selection markers for this player
-                        const selectedByNames = [];
-                        if (role === "mafia") {
-                          for (const selector in mafiaSelections) {
-                            if (mafiaSelections[selector] === player.displayName) {
-                              selectedByNames.push(selector);
+                          // Collect Mafia Selection markers for this player
+                          const selectedByNames = [];
+                          if (role === "mafia") {
+                            for (const selector in mafiaSelections) {
+                              if (mafiaSelections[selector] === player.displayName) {
+                                selectedByNames.push(selector);
+                              }
                             }
                           }
-                        }
 
-                        return (
-                          <button
-                            key={player.displayName}
-                            disabled={!isSelectable}
-                            onClick={() => handleMafiaCardClick(player.displayName)}
-                            style={{
-                              width: "100%",
-                              padding: "0.75rem 1rem",
-                              borderRadius: "0.75rem",
-                              fontFamily: "'Syne', sans-serif",
-                              fontWeight: 700,
-                              fontSize: "0.8rem",
-                              textAlign: "left",
-                              cursor: isSelectable ? "pointer" : "not-allowed",
-                              transition: "all 0.2s",
-                              background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
-                              border: isSelected ? `1px solid ${currentRoleObj.color}` : "1px solid rgba(255,255,255,0.05)",
-                              color: isSelected ? "#fff" : isSelectable ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center"
-                            }}
-                          >
-                            <div>
-                              <span>{player.displayName} {isSelf && "(You)"}</span>
-                              {selectedByNames.length > 0 && (
-                                <span style={{ fontSize: "0.68rem", color: "#fc8181", marginLeft: "0.5rem", fontStyle: "italic" }}>
-                                  (Selected by: {selectedByNames.join(", ")})
-                                </span>
-                              )}
-                            </div>
-                            {isSelected && <i className="fa-solid fa-circle-dot" style={{ color: currentRoleObj.color }} />}
-                          </button>
-                        );
-                      })}
+                          return (
+                            <button
+                              key={player.displayName}
+                              onClick={() => handleMafiaCardClick(player.displayName)}
+                              style={{
+                                width: "100%",
+                                padding: "0.75rem 1rem",
+                                borderRadius: "0.75rem",
+                                fontFamily: "'Syne', sans-serif",
+                                fontWeight: 700,
+                                fontSize: "0.8rem",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                transition: "all 0.2s",
+                                background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                                border: isSelected ? `1px solid ${currentRoleObj.color}` : "1px solid rgba(255,255,255,0.05)",
+                                color: isSelected ? "#fff" : "rgba(255,255,255,0.7)",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                              }}
+                            >
+                              <div>
+                                <span>{player.displayName}</span>
+                                {selectedByNames.length > 0 && (
+                                  <span style={{ fontSize: "0.68rem", color: "#fc8181", marginLeft: "0.5rem", fontStyle: "italic" }}>
+                                    (Selected by: {selectedByNames.join(", ")})
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && <i className="fa-solid fa-circle-dot" style={{ color: currentRoleObj.color }} />}
+                            </button>
+                          );
+                        })}
                     </div>
 
                     <button
