@@ -3,7 +3,7 @@ import { getPusherServer, getRoomChannel } from "@/lib/pusher-server";
 
 export async function POST(req) {
   try {
-    const { roomCode, messageId, emoji, role, displayName } = await req.json();
+    const { roomCode, messageId, emoji, role } = await req.json();
     if (!roomCode || !messageId || !emoji) {
       return NextResponse.json({ error: "roomCode, messageId and emoji required" }, { status: 400 });
     }
@@ -15,7 +15,6 @@ export async function POST(req) {
       messageId,
       emoji,
       role,
-      displayName: displayName || "Someone",
     });
 
     return NextResponse.json({ ok: true });
